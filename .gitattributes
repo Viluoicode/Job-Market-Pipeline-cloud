@@ -1,0 +1,10 @@
+# Normalize line endings to LF in the repo and on checkout — consistent across OSes and
+# avoids the "LF will be replaced by CRLF" churn on Windows.
+* text=auto eol=lf
+
+# Treat these as binary (never convert).
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary

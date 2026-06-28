@@ -1,0 +1,57 @@
+name: terraform
+
+# Lint + validate the IaC on every push/PR. fmt + validate need no AWS credentials, so CI stays
+# green for free. `plan` (which needs credentials) is an optional manual run — wire up OIDC and
+# uncomment the job below if you want it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: fmt + validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.8"
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: terraform init (no backend)
+        run: terraform init -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+  # plan:
+  #   name: plan (needs AWS creds via OIDC)
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #     id-token: write   # for aws-actions/configure-aws-credentials OIDC
+  #   defaults:
+  #     run:
+  #       working-directory: infra
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: aws-actions/configure-aws-credentials@v4
+  #       with:
+  #         role-to-assume: ${{ secrets.AWS_PLAN_ROLE_ARN }}
+  #         aws-region: ap-southeast-1
+  #     - uses: hashicorp/setup-terraform@v3
+  #       with:
+  #         terraform_version: "1.9.8"
+  #     - run: terraform init
+  #     - run: terraform plan -input=false

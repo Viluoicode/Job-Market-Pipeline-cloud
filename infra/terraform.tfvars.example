@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is gitignored.
+
+project     = "jobmarket-aws"
+region      = "ap-southeast-1"
+alert_email = "you@example.com" # budget alert at 80% of $10/mo (put your real email in terraform.tfvars)
+
+# Bucket names are auto-generated as <project>-<account_id>-<region>-<zone> (globally unique).
+# Uncomment to override with your own names:
+# lake_bucket_name           = "my-jobmarket-lake"
+# athena_results_bucket_name = "my-jobmarket-athena"
+# scripts_bucket_name        = "my-jobmarket-scripts"

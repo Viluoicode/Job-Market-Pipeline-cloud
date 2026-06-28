@@ -1,0 +1,33 @@
+# ---- Terraform ----
+infra/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+# Keep .terraform.lock.hcl committed (pins provider versions). Ignore real tfvars (keep .example).
+infra/terraform.tfvars
+infra/*.auto.tfvars
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# ---- Local scratch / ingestion dry-run output ----
+bronze_local/
+out/
+*.local.json
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ---- Claude Code local settings ----
+.claude/settings.local.json

@@ -1,0 +1,3 @@
+# Ingestion only (Glue supplies PySpark in the cloud; these run land_to_bronze.py locally).
+boto3>=1.34
+httpx>=0.27
