@@ -1,4 +1,4 @@
-# Job Market AWS Pipeline — cloud-native Medallion (P2)
+# Job Market AWS Pipeline — cloud-native Medallion 
 
 A cloud-native rebuild of the SkillRadar Medallion pipeline on AWS, provisioned end-to-end with
 **Terraform**. Same domain (tech job postings), but the local DuckDB/dbt stack is replaced by an
