@@ -484,9 +484,10 @@ Không. Cả 4 đều là API công khai.
 ### Mở rộng (P2.5)
 - ✅ **Glue Data Quality** — *đã làm.* Bộ rule DQDL kiểm chất lượng bảng Silver ngay trong
   `bronze_to_silver.py` (song song với dbt tests bên SkillRadar). Xem [mục 4 · Tầng Silver](#-tầng-silver--làm-sạch--khử-trùng-trong-nguồn).
-- ✅ **EventBridge schedule** — *đã thêm IaC* ([`infra/schedule.tf`](../infra/schedule.tf)). Rule
+- ✅ **EventBridge schedule** — *đã deploy* ([`infra/schedule.tf`](../infra/schedule.tf)). Rule
   EventBridge chạy state machine theo lịch (mặc định hằng ngày 18:00 UTC). **Tắt sẵn mặc định** cho
   an toàn tiền — đặt `enable_schedule = true` trong `terraform.tfvars` để bật (rule tắt thì 0đ).
+  *(Verify 2026-07-27: rule live, trạng thái DISABLED, target trỏ đúng state machine.)*
 - ⏳ Còn lại (tuỳ chọn): Redshift Serverless + Spectrum · Lambda bọc ingestion để pipeline hoàn
   toàn serverless.
 </content>

@@ -198,10 +198,11 @@ Designed to run on the **Free Tier for cents**, but you control the spend:
 - ✅ **Glue Data Quality** — *implemented.* A DQDL ruleset gates the Silver table inside
   `bronze_to_silver.py` (the cloud parallel of SkillRadar's dbt `not_null` / `unique` /
   `accepted_values` tests). See [Data quality gate](#data-quality-gate-silver) below.
-- ✅ **EventBridge schedule** — *IaC added* ([`infra/schedule.tf`](infra/schedule.tf)). An
-  EventBridge rule can trigger the Step Functions state machine on a cron (default daily 18:00 UTC).
+- ✅ **EventBridge schedule** — *deployed* ([`infra/schedule.tf`](infra/schedule.tf)). An
+  EventBridge rule triggers the Step Functions state machine on a cron (default daily 18:00 UTC).
   **Disabled by default** as a cost guardrail — set `enable_schedule = true` (and optionally
   `schedule_expression`) in `terraform.tfvars` to turn it on. A disabled rule costs nothing.
+  *Verified 2026-07-27: rule live, state `DISABLED`, target = the pipeline state machine.*
 - **Redshift Serverless + Spectrum** reading the same Gold Parquet (warehouse keyword).
 - **Lambda** wrapper around the ingestion so the whole thing is serverless.
 
