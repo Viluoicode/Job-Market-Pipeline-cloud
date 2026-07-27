@@ -207,7 +207,13 @@ Việc nó làm:
 
 4. **Giữ 1 dòng cho mỗi `job_id`** (bản mới nhất) bằng kỹ thuật cửa sổ
    `Window.partitionBy("job_id")` + `row_number() = 1`.
-5. Ghi **Parquet** ra `silver/jobs/snapshot_date=<ngày>/`.
+5. **Kiểm chất lượng (Data Quality gate)** — trước khi ghi, chạy bộ rule **AWS Glue Data Quality**
+   (viết bằng DQDL) trên bảng Silver. Đây là bản "cloud" của dbt tests bên SkillRadar:
+   `job_id` không null & duy nhất (= `not_null` + `unique`), `dedup_hash` không null, `source` chỉ
+   thuộc 4 nguồn hợp lệ (= `accepted_values`), `company` điền ≥ 90%. Nếu **có rule fail → job dừng**
+   (dữ liệu xấu không lọt vào Silver). Kết quả hiện lên **Glue Data Quality console** + lưu ra
+   `quality/silver_jobs/`. *(Lượt verify 2026-07-27: score 1.0, 7/7 rule PASS.)*
+6. Ghi **Parquet** ra `silver/jobs/snapshot_date=<ngày>/`.
 
 > 💡 `snapshot_date` = "ảnh chụp thị trường" của ngày chạy. Mỗi lần chạy tạo 1 partition mới,
 > không đụng vào ngày cũ → so sánh xu hướng theo thời gian được.
@@ -475,8 +481,10 @@ Không. Cả 4 đều là API công khai.
 2. `terraform destroy` sau khi chụp xong để **dừng chi phí** (infra để idle vẫn tốn lặt vặt).
 3. (Tuỳ chọn) triển khai một trong các mở rộng P2.5 bên dưới để làm project nổi bật hơn.
 
-### Mở rộng tương lai (tuỳ chọn, P2.5)
-Redshift Serverless + Spectrum · EventBridge chạy theo lịch · Glue Data Quality · Lambda bọc
-ingestion để pipeline hoàn toàn serverless.
+### Mở rộng (P2.5)
+- ✅ **Glue Data Quality** — *đã làm.* Bộ rule DQDL kiểm chất lượng bảng Silver ngay trong
+  `bronze_to_silver.py` (song song với dbt tests bên SkillRadar). Xem [mục 4 · Tầng Silver](#-tầng-silver--làm-sạch--khử-trùng-trong-nguồn).
+- ⏳ Còn lại (tuỳ chọn): Redshift Serverless + Spectrum · EventBridge chạy theo lịch · Lambda bọc
+  ingestion để pipeline hoàn toàn serverless.
 </content>
 </invoke>

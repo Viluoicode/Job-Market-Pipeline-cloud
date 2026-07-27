@@ -82,6 +82,26 @@ SkillRadar's `make_job_id` / `compute_dedup_hash` / `normalize_for_key`, so the 
 Then it keeps **one row per `job_id`** (latest `posted_at`, via `Window.partitionBy("job_id")` +
 `row_number()=1`) and writes typed **Parquet** to `silver/jobs/snapshot_date=<date>/`.
 
+#### Data quality gate (Silver)
+
+Before Silver is published, `bronze_to_silver.py` runs an **AWS Glue Data Quality** ruleset
+(`EvaluateDataQuality`, DQDL) over the deduped DataFrame — the cloud parallel of SkillRadar's dbt
+tests:
+
+| DQDL rule | dbt equivalent | Asserts |
+| --------- | -------------- | ------- |
+| `IsComplete "job_id"` | `not_null` | surrogate key always present |
+| `IsUnique "job_id"` | `unique` | within-source dedup actually held |
+| `IsComplete "dedup_hash"` | `not_null` | cross-source key present |
+| `ColumnValues "source" in [...]` | `accepted_values` | only the 4 known sources |
+| `Completeness "company" >= 0.9` | `not_null` (threshold) | company mostly populated |
+| `RowCount > 0` | — | the run produced data |
+
+Results publish to the **Glue Data Quality console** + CloudWatch and are persisted to
+`quality/silver_jobs/snapshot_date=<date>/` for audit. With `--dq_enforce true` (default) any
+failing rule **fails the job**, so bad data never reaches Silver. *Verified run (2026-07-27):
+score **1.0**, 7/7 rules PASS.*
+
 ### Stage 3 · Silver → Gold — `glue/jobs/silver_to_gold.py` (PySpark on Glue)
 
 Builds **two marts**:
@@ -173,11 +193,13 @@ Designed to run on the **Free Tier for cents**, but you control the spend:
 6. **Polish** — add a GitHub Actions workflow (`terraform fmt -check` + `validate` + `plan`),
    an architecture diagram, and a short write-up comparing this to SkillRadar.
 
-### Optional extensions (P2.5)
+### Extensions (P2.5)
 
+- ✅ **Glue Data Quality** — *implemented.* A DQDL ruleset gates the Silver table inside
+  `bronze_to_silver.py` (the cloud parallel of SkillRadar's dbt `not_null` / `unique` /
+  `accepted_values` tests). See [Data quality gate](#data-quality-gate-silver) below.
 - **Redshift Serverless + Spectrum** reading the same Gold Parquet (warehouse keyword).
 - **EventBridge** schedule to run the state machine daily.
-- **Glue Data Quality** rules on the Silver tables (parallels SkillRadar's dbt tests).
 - **Lambda** wrapper around the ingestion so the whole thing is serverless.
 
 ## Layout

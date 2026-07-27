@@ -22,11 +22,68 @@ import sys
 from datetime import datetime, timezone
 
 from awsglue.context import GlueContext
+from awsglue.dynamicframe import DynamicFrame
 from awsglue.job import Job
+from awsglue.transforms import SelectFromCollection
 from awsglue.utils import getResolvedOptions
+from awsgluedq.transforms import EvaluateDataQuality
 from pyspark.context import SparkContext
 from pyspark.sql import Window
 from pyspark.sql import functions as F
+
+
+# Data Quality gate on the Silver table — the cloud/Glue parallel of SkillRadar's dbt tests
+# (not_null / unique / accepted_values). Rules are written in DQDL (Data Quality Definition
+# Language); EvaluateDataQuality runs them inside the job and publishes a score to the Glue
+# Data Quality console. Chosen to assert the invariants the transform is supposed to guarantee.
+DQ_RULESET = """Rules = [
+    RowCount > 0,
+    IsComplete "job_id",
+    IsUnique "job_id",
+    IsComplete "dedup_hash",
+    IsComplete "is_remote",
+    ColumnValues "source" in [ "greenhouse", "lever", "ashby", "arbeitnow" ],
+    Completeness "company" >= 0.9
+]"""
+
+
+def run_data_quality(glue, df, bucket, snapshot_date, enforce=True):
+    """Evaluate DQ_RULESET against the Silver DataFrame.
+
+    Publishes results to the Glue Data Quality console + CloudWatch, persists the per-rule
+    outcomes to ``s3://<bucket>/quality/silver_jobs/snapshot_date=<date>/`` for audit/Athena,
+    and (when ``enforce``) fails the job if any rule fails — so bad data never reaches Silver.
+    """
+    dyf = DynamicFrame.fromDF(df, glue, "silver_dq_input")
+    results = EvaluateDataQuality().process_rows(
+        frame=dyf,
+        ruleset=DQ_RULESET,
+        publishing_options={
+            "dataQualityEvaluationContext": "silver_jobs",
+            "enableDataQualityResultsPublishing": True,
+            "enableDataQualityCloudWatchMetrics": True,
+        },
+        additional_options={"performanceTuning.caching": "CACHE_NOTHING"},
+    )
+
+    outcomes = SelectFromCollection.apply(dfc=results, key="ruleOutcomes").toDF()
+    outcomes.cache()
+    print("[dq] per-rule outcomes:")
+    outcomes.select("Rule", "Outcome", "FailureReason").show(50, truncate=False)
+
+    quality_path = f"s3://{bucket}/quality/silver_jobs/"
+    (
+        outcomes.withColumn("snapshot_date", F.lit(snapshot_date).cast("date"))
+        .write.mode("overwrite")
+        .partitionBy("snapshot_date")
+        .parquet(quality_path)
+    )
+
+    total = outcomes.count()
+    n_failed = outcomes.where(F.col("Outcome") == "Failed").count()
+    print(f"[dq] {total - n_failed}/{total} rules passed (snapshot_date={snapshot_date})")
+    if n_failed and enforce:
+        raise RuntimeError(f"[dq] {n_failed} data-quality rule(s) failed on Silver — failing the job")
 
 
 def optional_arg(name: str, default: str) -> str:
@@ -125,6 +182,12 @@ def main() -> None:
             "first_seen_at", "last_seen_at", "is_active", "description", "snapshot_date",
         )
     )
+
+    # Data Quality gate: assert Silver invariants before publishing (set --dq_enforce false to
+    # log-only instead of failing the job).
+    enforce = optional_arg("dq_enforce", "true").strip().lower() not in ("false", "0", "no")
+    print(f"[bronze_to_silver] running data quality on Silver (enforce={enforce})")
+    run_data_quality(glue, silver, bucket, snapshot_date, enforce=enforce)
 
     out_path = f"s3://{bucket}/silver/jobs/"
     print(f"[bronze_to_silver] writing Parquet -> {out_path} (partition snapshot_date={snapshot_date})")
