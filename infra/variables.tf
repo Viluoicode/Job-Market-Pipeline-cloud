@@ -98,3 +98,16 @@ variable "alert_email" {
   type        = string
   default     = ""
 }
+
+# ---- EventBridge schedule (optional daily run) ----
+variable "enable_schedule" {
+  description = "Enable the EventBridge daily trigger for the pipeline. Keep false unless you want automatic daily runs (each run costs a few cents of Glue)."
+  type        = bool
+  default     = false
+}
+
+variable "schedule_expression" {
+  description = "EventBridge schedule for the pipeline (cron/rate). Default: daily at 18:00 UTC (01:00 GMT+7)."
+  type        = string
+  default     = "cron(0 18 * * ? *)"
+}

@@ -42,3 +42,8 @@ output "gold_crawler" {
   description = "Glue crawler name (Gold)."
   value       = aws_glue_crawler.gold.name
 }
+
+output "schedule_rule" {
+  description = "EventBridge rule name + state for the scheduled pipeline run."
+  value       = "${aws_cloudwatch_event_rule.pipeline.name} (${aws_cloudwatch_event_rule.pipeline.state})"
+}
