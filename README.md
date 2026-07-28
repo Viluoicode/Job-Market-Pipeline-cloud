@@ -24,7 +24,7 @@ S3  bronze/   raw newline-delimited JSON, partitioned by source/date
 S3  silver/   typed, deduped Parquet, partitioned by snapshot_date
         │  Glue job: silver_to_gold.py    (PySpark: role classification + aggregates)
         ▼
-S3  gold/     fact_job_posting/, demand_by_role/  (Parquet marts)
+S3  gold/     fact_job_posting/, role_opportunity/, demand_by_role/  (Parquet marts)
         │  Glue crawler  ->  Glue Data Catalog
         ▼
 Athena (SQL over the catalog)        [optional later: Redshift Spectrum reads the same Gold]
@@ -122,8 +122,8 @@ SparkSession):
      can match several roles).
   3. **Count:** `groupBy(role).countDistinct(job_id)` → the final "which role is most in demand" number.
 
-Both are Parquet partitioned by `snapshot_date`; the **Glue Crawler** then registers them in the
-**Data Catalog** so **Athena** can query them.
+All three are Parquet partitioned by `snapshot_date`; the **Glue Crawler** then registers them in
+the **Data Catalog** so **Athena** can query them.
 
 ### Data model (Gold)
 
