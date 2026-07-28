@@ -250,6 +250,17 @@ Tạo **2 bảng kết quả**:
 3. **Đếm**: `groupBy("role").countDistinct("job_id")` → mỗi nghề có bao nhiêu tin. Sắp giảm dần.
    **Đây chính là con số cuối cùng** để vẽ biểu đồ "nghề nào hot nhất".
 
+**Bảng 3 — `role_opportunity`** (bảng "quyết định"): lấy `demand_by_role` rồi *làm giàu* thêm các
+cột mà người đi xin việc thật sự cần để quyết định — `demand_rank` (xếp hạng), `remote_pct` (%
+tin remote của nghề đó), và `top_company` (công ty tuyển nhiều nhất cho nghề đó). Một bảng trả lời
+gọn: *"nên học/ứng tuyển nghề nào, có dễ remote không, ai đang tuyển?"* — đây là thứ
+[dashboard](dashboard.html) vẽ ra.
+
+> 🧪 **Kiểm thử (tests):** logic 3 bảng trên được tách thành hàm PySpark thuần (`build_fact`,
+> `build_demand_by_role`, `build_role_opportunity`) trong `glue/jobs/`, nên `tests/` chạy được
+> `pytest` trên SparkSession local để kiểm: `job_id` ổn định, `dedup_hash` khớp chéo nguồn, phân
+> loại nghề đúng, và các cột của bảng quyết định đúng. Chạy tự động trong CI (Python 3.11 + Java 17).
+
 ### Tóm tắt 3 tầng
 
 | Tầng | Định dạng | Việc chính | Khử trùng | Chạy ở đâu |

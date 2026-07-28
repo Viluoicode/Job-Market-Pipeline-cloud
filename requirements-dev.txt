@@ -1,0 +1,4 @@
+# Dev/test only — run the PySpark transform unit tests locally or in CI.
+# Needs Python <=3.12 and Java 17 (PySpark does not support Python 3.13+/Java 21+).
+pyspark==3.5.1
+pytest>=8

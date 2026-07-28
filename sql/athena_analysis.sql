@@ -3,6 +3,13 @@
 -- Parquet + snapshot_date partitions keep every query well under 1 cent (the workgroup also
 -- caps each query at 10 GB scanned). Screenshot the results for your portfolio.
 
+-- 0) THE DECISION QUERY — the role_opportunity mart in one shot: demand rank, remote share, and
+--    the top hiring company per role. This is what the dashboard renders.
+SELECT demand_rank, role, job_count, remote_pct, top_company, top_company_count
+FROM jobmarket_aws_gold.role_opportunity
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.role_opportunity)
+ORDER BY demand_rank;
+
 -- 1) Headline leaderboard — demand by target role for the latest snapshot.
 SELECT role, job_count
 FROM jobmarket_aws_gold.demand_by_role

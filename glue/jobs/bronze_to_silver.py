@@ -12,6 +12,11 @@ This is the cloud/Spark equivalent of SkillRadar's Bronze->Silver step:
   * ``norm`` lower-cases, strips punctuation to spaces, collapses whitespace
                                                                   (port of text.normalize_for_key)
 
+The type/key/dedup logic lives in an importable, Glue-free function (``build_silver``) so
+``tests/`` can exercise it on a local SparkSession without AWS. Glue-only imports (GlueContext,
+EvaluateDataQuality, ...) are done lazily inside the functions that need them, so importing this
+module for testing needs only ``pyspark``.
+
 Args (Glue job parameters):
   --JOB_NAME       (provided by Glue)
   --LAKE_BUCKET    data lake bucket name
@@ -21,14 +26,7 @@ Args (Glue job parameters):
 import sys
 from datetime import datetime, timezone
 
-from awsglue.context import GlueContext
-from awsglue.dynamicframe import DynamicFrame
-from awsglue.job import Job
-from awsglue.transforms import SelectFromCollection
-from awsglue.utils import getResolvedOptions
-from awsgluedq.transforms import EvaluateDataQuality
-from pyspark.context import SparkContext
-from pyspark.sql import Window
+from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
 
 
@@ -54,6 +52,10 @@ def run_data_quality(glue, df, bucket, snapshot_date, enforce=True):
     outcomes to ``s3://<bucket>/quality/silver_jobs/snapshot_date=<date>/`` for audit/Athena,
     and (when ``enforce``) fails the job if any rule fails — so bad data never reaches Silver.
     """
+    from awsglue.dynamicframe import DynamicFrame
+    from awsglue.transforms import SelectFromCollection
+    from awsgluedq.transforms import EvaluateDataQuality
+
     dyf = DynamicFrame.fromDF(df, glue, "silver_dq_input")
     results = EvaluateDataQuality().process_rows(
         frame=dyf,
@@ -118,29 +120,11 @@ def parse_ts(colname: str):
     )
 
 
-def main() -> None:
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET"])
-    snapshot_date = optional_arg("snapshot_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    bucket = args["LAKE_BUCKET"]
+def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
+    """Type the raw Bronze JSON, compute job_id + dedup_hash, keep one row per job_id.
 
-    sc = SparkContext.getOrCreate()
-    glue = GlueContext(sc)
-    spark = glue.spark_session
-    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
-    job = Job(glue)
-    job.init(args["JOB_NAME"], args)
-
-    bronze_path = f"s3://{bucket}/bronze/"
-    print(f"[bronze_to_silver] reading {bronze_path} (snapshot_date={snapshot_date})")
-
-    # recursiveFileLookup: read every jobs.json under bronze/ and take `source` from the record
-    # body (not the partition dir), so it never clashes with the `source=` path column.
-    raw = (
-        spark.read.option("recursiveFileLookup", "true")
-        .option("mode", "PERMISSIVE")
-        .json(bronze_path)
-    )
-
+    Pure PySpark (no Glue) so it is unit-testable on a local SparkSession.
+    """
     now_ts = F.current_timestamp()
     typed = (
         raw.select(
@@ -172,7 +156,7 @@ def main() -> None:
 
     # One row per posting: keep the most recently posted record for each job_id.
     keep = Window.partitionBy("job_id").orderBy(F.col("posted_at").desc_nulls_last())
-    silver = (
+    return (
         typed.withColumn("_rn", F.row_number().over(keep))
         .where(F.col("_rn") == 1)
         .drop("_rn")
@@ -182,6 +166,37 @@ def main() -> None:
             "first_seen_at", "last_seen_at", "is_active", "description", "snapshot_date",
         )
     )
+
+
+def main() -> None:
+    from awsglue.context import GlueContext
+    from awsglue.job import Job
+    from awsglue.utils import getResolvedOptions
+    from pyspark.context import SparkContext
+
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET"])
+    snapshot_date = optional_arg("snapshot_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    bucket = args["LAKE_BUCKET"]
+
+    sc = SparkContext.getOrCreate()
+    glue = GlueContext(sc)
+    spark = glue.spark_session
+    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    job = Job(glue)
+    job.init(args["JOB_NAME"], args)
+
+    bronze_path = f"s3://{bucket}/bronze/"
+    print(f"[bronze_to_silver] reading {bronze_path} (snapshot_date={snapshot_date})")
+
+    # recursiveFileLookup: read every jobs.json under bronze/ and take `source` from the record
+    # body (not the partition dir), so it never clashes with the `source=` path column.
+    raw = (
+        spark.read.option("recursiveFileLookup", "true")
+        .option("mode", "PERMISSIVE")
+        .json(bronze_path)
+    )
+
+    silver = build_silver(raw, snapshot_date)
 
     # Data Quality gate: assert Silver invariants before publishing (set --dq_enforce false to
     # log-only instead of failing the job).

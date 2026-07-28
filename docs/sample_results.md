@@ -22,6 +22,24 @@ Queries live in [`../sql/athena_analysis.sql`](../sql/athena_analysis.sql), run 
 | Remote | 2,434 (~36%) |
 | Distinct companies | 161 |
 
+## Decision mart (`role_opportunity`) — snapshot 2026-07-28
+
+The mart the dashboard renders: per role, demand rank + remote share + top hiring company.
+
+| Rank | Role | Demand | Remote % | Top employer (postings) |
+| --- | --- | --- | --- | --- |
+| 1 | Machine Learning Engineer | 207 | 43.5% | Mistral AI (27) |
+| 2 | Data Scientist | 142 | 47.9% | Lyft (21) |
+| 3 | Full Stack Engineer | 117 | 37.6% | Databricks (17) |
+| 4 | DevOps Engineer | 116 | 38.8% | Palantir (21) |
+| 5 | Backend Engineer | 78 | 41.0% | GitLab (22) |
+| 6 | Data Engineer | 65 | 53.8% | OpenAI (9) |
+| 7 | Mobile Engineer | 50 | 40.0% | Reddit (12) |
+| 8 | Frontend Engineer | 17 | 41.2% | Airbnb (3) |
+
+Read as a decision: ML/AI roles dominate demand; Data Engineer is the most remote-friendly of the
+top roles (53.8%). Rendered in [`dashboard.html`](dashboard.html).
+
 ## Demand by role (`demand_by_role`)
 
 Distinct postings whose title matches each target role's patterns.

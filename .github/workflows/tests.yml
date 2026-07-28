@@ -1,0 +1,31 @@
+name: tests
+
+# Unit-test the PySpark transforms on a real (local) SparkSession. Runs on Python 3.11 + Java 17,
+# the versions PySpark 3.5 supports — hence CI rather than the author's newer local toolchain.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pytest:
+    name: pytest (PySpark transforms)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test deps
+        run: pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: pytest -q

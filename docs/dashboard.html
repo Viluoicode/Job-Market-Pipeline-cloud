@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Job Market AWS Pipeline — decision dashboard. Numbers queried from Athena (snapshot 2026-07-28).
+     Live/shareable version rendered via Claude Artifacts: https://claude.ai/code/artifact/2b3e2547-4053-4204-8ee8-f122b262b98e -->
+</head><body>
+<title>Tech Job Market — Role Demand Briefing</title>
+<style>
+  :root {
+    --bg: #F7F5F1;
+    --surface: #FFFFFF;
+    --surface-2: #FBFAF7;
+    --ink: #1C1F26;
+    --muted: #6B7280;
+    --faint: #9AA0AA;
+    --hairline: #E7E2D9;
+    --accent: #B96A0E;        /* amber — demand heat */
+    --accent-track: #EFE7DA;  /* bar track on light */
+    --cool: #2F6F6A;          /* teal — remote signal */
+    --cool-bg: #E4EEEC;
+    --shadow: 0 1px 2px rgba(28,31,38,.05), 0 8px 28px rgba(28,31,38,.05);
+    --font-display: Georgia, "Times New Roman", serif;
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151A; --surface: #191D24; --surface-2: #1E232B;
+      --ink: #EAECEF; --muted: #98A0AD; --faint: #6E7682; --hairline: #2A2F38;
+      --accent: #E8A93C; --accent-track: #2C2A24; --cool: #5FB3AC; --cool-bg: #1B2B2A;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #F7F5F1; --surface: #FFFFFF; --surface-2: #FBFAF7;
+    --ink: #1C1F26; --muted: #6B7280; --faint: #9AA0AA; --hairline: #E7E2D9;
+    --accent: #B96A0E; --accent-track: #EFE7DA; --cool: #2F6F6A; --cool-bg: #E4EEEC;
+    --shadow: 0 1px 2px rgba(28,31,38,.05), 0 8px 28px rgba(28,31,38,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151A; --surface: #191D24; --surface-2: #1E232B;
+    --ink: #EAECEF; --muted: #98A0AD; --faint: #6E7682; --hairline: #2A2F38;
+    --accent: #E8A93C; --accent-track: #2C2A24; --cool: #5FB3AC; --cool-bg: #1B2B2A;
+    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans); line-height: 1.5;
+    -webkit-font-smoothing: antialiased; font-feature-settings: "kern";
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: clamp(1.4rem, 4vw, 3.5rem) clamp(1.1rem, 4vw, 2rem) 4rem; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* ---- Masthead ---- */
+  .masthead { border-bottom: 1px solid var(--hairline); padding-bottom: 1.6rem; margin-bottom: 1.9rem; }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 .7rem; display: flex; align-items: center; gap: .55rem;
+  }
+  .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--accent); display: inline-block; }
+  h1 {
+    font-family: var(--font-display); font-weight: 600; font-size: clamp(1.85rem, 4.6vw, 2.7rem);
+    line-height: 1.08; letter-spacing: -.01em; margin: 0 0 .7rem; text-wrap: balance;
+  }
+  .dek { color: var(--muted); font-size: 1.02rem; max-width: 56ch; margin: 0; text-wrap: pretty; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: .5rem 1.4rem; margin-top: 1.2rem;
+    font-family: var(--font-mono); font-size: .72rem; color: var(--faint); letter-spacing: .03em;
+  }
+  .meta b { color: var(--muted); font-weight: 600; }
+
+  /* ---- Stat tiles ---- */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: .8rem; margin-bottom: 2.6rem; }
+  .tile {
+    background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px;
+    padding: 1.05rem 1.1rem; box-shadow: var(--shadow);
+  }
+  .tile .k { font-family: var(--font-mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin: 0 0 .5rem; }
+  .tile .v { font-family: var(--font-display); font-size: 1.85rem; line-height: 1; font-weight: 600; }
+  .tile .s { font-size: .78rem; color: var(--muted); margin-top: .35rem; }
+
+  /* ---- Section headings ---- */
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin: 0 0 1.1rem; }
+  h2 { font-family: var(--font-display); font-weight: 600; font-size: 1.32rem; letter-spacing: -.01em; margin: 0; }
+  .sec-note { font-size: .8rem; color: var(--muted); text-align: right; }
+
+  /* ---- Leaderboard ---- */
+  .board { display: flex; flex-direction: column; gap: 2px; background: var(--hairline); border: 1px solid var(--hairline); border-radius: 14px; overflow: hidden; box-shadow: var(--shadow); }
+  .row {
+    display: grid; grid-template-columns: 2.1rem minmax(0,1fr) 5.4rem 9.6rem;
+    align-items: center; gap: .9rem; padding: .85rem 1.1rem; background: var(--surface);
+    transition: background .12s ease;
+  }
+  .row:hover { background: var(--surface-2); }
+  .row.target { box-shadow: inset 3px 0 0 var(--cool); }
+  .rank { font-family: var(--font-mono); font-size: .82rem; color: var(--faint); }
+  .role { min-width: 0; }
+  .role .name { font-weight: 600; font-size: .96rem; display: flex; align-items: center; gap: .5rem; }
+  .tag { font-family: var(--font-mono); font-size: .58rem; letter-spacing: .06em; text-transform: uppercase; color: var(--cool); border: 1px solid var(--cool); border-radius: 999px; padding: .08rem .4rem; }
+  .barline { display: flex; align-items: center; gap: .6rem; margin-top: .42rem; }
+  .track { flex: 1; height: 8px; background: var(--accent-track); border-radius: 999px; overflow: hidden; }
+  .fill { height: 100%; background: var(--accent); border-radius: 999px; }
+  .demand { font-family: var(--font-mono); font-size: .82rem; font-weight: 600; color: var(--ink); min-width: 2.4ch; text-align: right; }
+  .remote { text-align: center; }
+  .pill {
+    display: inline-block; font-family: var(--font-mono); font-size: .74rem; font-weight: 600;
+    color: var(--cool); background: var(--cool-bg); border-radius: 999px; padding: .18rem .5rem; min-width: 3.6em;
+  }
+  .company { font-size: .82rem; color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .company b { color: var(--ink); font-weight: 600; }
+  .col-label { font-family: var(--font-mono); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+  .head-row { padding-top: .6rem; padding-bottom: .6rem; background: var(--surface-2); }
+
+  /* ---- Sources ---- */
+  .sources { margin-top: 2.6rem; }
+  .src { display: grid; grid-template-columns: 6.8rem minmax(0,1fr) 4rem 5.4rem; align-items: center; gap: .9rem; padding: .5rem 0; border-top: 1px solid var(--hairline); }
+  .src:first-of-type { border-top: none; }
+  .src .sname { font-weight: 600; font-size: .9rem; }
+  .src .strack { height: 7px; background: var(--accent-track); border-radius: 999px; overflow: hidden; }
+  .src .sfill { height: 100%; background: var(--accent); opacity: .85; border-radius: 999px; }
+  .src .scount { font-family: var(--font-mono); font-size: .82rem; font-weight: 600; text-align: right; }
+  .src .sremote { font-family: var(--font-mono); font-size: .74rem; color: var(--cool); text-align: right; }
+
+  footer { margin-top: 3rem; padding-top: 1.4rem; border-top: 1px solid var(--hairline); font-size: .78rem; color: var(--faint); line-height: 1.7; }
+  footer code { font-family: var(--font-mono); font-size: .74rem; color: var(--muted); background: var(--surface-2); padding: .1rem .35rem; border-radius: 5px; }
+  .flow { font-family: var(--font-mono); font-size: .72rem; color: var(--muted); letter-spacing: .01em; }
+  .flow b { color: var(--accent); }
+
+  @media (max-width: 720px) {
+    .tiles { grid-template-columns: repeat(2, 1fr); }
+    .row { grid-template-columns: 1.8rem 1fr; row-gap: .5rem; }
+    .row .remote, .row .company { grid-column: 2; text-align: left; }
+    .company { white-space: normal; }
+    .head-row { display: none; }
+    .src { grid-template-columns: 5.4rem minmax(0,1fr) 3.4rem 4rem; gap: .6rem; }
+    .sec-note br { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="masthead">
+    <p class="eyebrow">Job Market Pipeline · Gold mart <code style="all:unset;font-family:inherit">role_opportunity</code></p>
+    <h1>Which engineering role is the market asking for?</h1>
+    <p class="dek">A demand briefing built from <b>9,206</b> live tech postings, deduplicated across four public job boards and classified into eight role families — the decision layer of a cloud-native AWS pipeline.</p>
+    <div class="meta">
+      <span><b>Snapshot</b> 2026-07-28</span>
+      <span><b>Source</b> Greenhouse · Lever · Ashby · Arbeitnow</span>
+      <span><b>Query</b> Athena over S3 Gold (Parquet)</span>
+    </div>
+  </header>
+
+  <section class="tiles" aria-label="Market at a glance">
+    <div class="tile"><p class="k">Active postings</p><div class="v tnum">9,206</div><p class="s">after cross-source dedup</p></div>
+    <div class="tile"><p class="k">Remote</p><div class="v tnum">35.4%</div><p class="s">3,259 fully-remote roles</p></div>
+    <div class="tile"><p class="k">Hiring companies</p><div class="v tnum">308</div><p class="s">distinct employers</p></div>
+    <div class="tile"><p class="k">Role families</p><div class="v tnum">8</div><p class="s">classified by title</p></div>
+  </section>
+
+  <section aria-label="Role demand leaderboard">
+    <div class="sec-head">
+      <h2>Demand by role</h2>
+      <p class="sec-note">Ranked by distinct postings ·<br>remote share &amp; top employer per role</p>
+    </div>
+    <div class="board">
+      <div class="row head-row" aria-hidden="true">
+        <span class="col-label">#</span>
+        <span class="col-label">Role &amp; demand</span>
+        <span class="col-label" style="text-align:center">Remote</span>
+        <span class="col-label" style="text-align:right">Top employer</span>
+      </div>
+
+      <div class="row">
+        <span class="rank">1</span>
+        <div class="role"><div class="name">Machine Learning Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:100%"></div></div><span class="demand tnum">207</span></div></div>
+        <div class="remote"><span class="pill tnum">43.5%</span></div>
+        <div class="company"><b>Mistral AI</b> · 27</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">2</span>
+        <div class="role"><div class="name">Data Scientist</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:68.6%"></div></div><span class="demand tnum">142</span></div></div>
+        <div class="remote"><span class="pill tnum">47.9%</span></div>
+        <div class="company"><b>Lyft</b> · 21</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">3</span>
+        <div class="role"><div class="name">Full Stack Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:56.5%"></div></div><span class="demand tnum">117</span></div></div>
+        <div class="remote"><span class="pill tnum">37.6%</span></div>
+        <div class="company"><b>Databricks</b> · 17</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">4</span>
+        <div class="role"><div class="name">DevOps Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:56.0%"></div></div><span class="demand tnum">116</span></div></div>
+        <div class="remote"><span class="pill tnum">38.8%</span></div>
+        <div class="company"><b>Palantir</b> · 21</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">5</span>
+        <div class="role"><div class="name">Backend Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:37.7%"></div></div><span class="demand tnum">78</span></div></div>
+        <div class="remote"><span class="pill tnum">41.0%</span></div>
+        <div class="company"><b>GitLab</b> · 22</div>
+      </div>
+
+      <div class="row target">
+        <span class="rank">6</span>
+        <div class="role"><div class="name">Data Engineer <span class="tag">this portfolio</span></div>
+          <div class="barline"><div class="track"><div class="fill" style="width:31.4%"></div></div><span class="demand tnum">65</span></div></div>
+        <div class="remote"><span class="pill tnum">53.8%</span></div>
+        <div class="company"><b>OpenAI</b> · 9</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">7</span>
+        <div class="role"><div class="name">Mobile Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:24.2%"></div></div><span class="demand tnum">50</span></div></div>
+        <div class="remote"><span class="pill tnum">40.0%</span></div>
+        <div class="company"><b>Reddit</b> · 12</div>
+      </div>
+
+      <div class="row">
+        <span class="rank">8</span>
+        <div class="role"><div class="name">Frontend Engineer</div>
+          <div class="barline"><div class="track"><div class="fill" style="width:8.2%"></div></div><span class="demand tnum">17</span></div></div>
+        <div class="remote"><span class="pill tnum">41.2%</span></div>
+        <div class="company"><b>Airbnb</b> · 3</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sources" aria-label="Postings by source board">
+    <div class="sec-head">
+      <h2>Where the postings come from</h2>
+      <p class="sec-note">Volume &amp; remote share by board</p>
+    </div>
+    <div class="src"><span class="sname">Greenhouse</span><div class="strack"><div class="sfill" style="width:100%"></div></div><span class="scount tnum">6,036</span><span class="sremote tnum">28.5%</span></div>
+    <div class="src"><span class="sname">Ashby</span><div class="strack"><div class="sfill" style="width:30.3%"></div></div><span class="scount tnum">1,831</span><span class="sremote tnum">76.5%</span></div>
+    <div class="src"><span class="sname">Lever</span><div class="strack"><div class="sfill" style="width:12.9%"></div></div><span class="scount tnum">778</span><span class="sremote tnum">9.5%</span></div>
+    <div class="src"><span class="sname">Arbeitnow</span><div class="strack"><div class="sfill" style="width:9.3%"></div></div><span class="scount tnum">561</span><span class="sremote tnum">11.4%</span></div>
+  </section>
+
+  <footer>
+    <span class="flow">Bronze (raw JSON) → <b>Silver</b> (typed + deduped, DQ-gated) → <b>Gold</b> (marts) → Athena</span><br>
+    Every number is queried live from the <code>role_opportunity</code> / <code>fact_job_posting</code> Gold marts in Athena.
+    Pipeline: S3 · Glue PySpark · Glue Data Quality · Step Functions · EventBridge — all provisioned with Terraform.
+  </footer>
+</div>
+</body></html>

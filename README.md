@@ -104,11 +104,17 @@ score **1.0**, 7/7 rules PASS.*
 
 ### Stage 3 · Silver → Gold — `glue/jobs/silver_to_gold.py` (PySpark on Glue)
 
-Builds **two marts**:
+Builds **three marts** (transform logic lives in importable functions — `build_fact`,
+`build_demand_by_role`, `build_role_opportunity` — so `tests/` can exercise them on a local
+SparkSession):
 
 - **`fact_job_posting`** — dedups **cross-source** by keeping one representative per `dedup_hash`
   (`row_number()=1`), adds `title_lower`, `company_key = md5(company)`, `posted_date_key`, and the
   additive measure `posting_count = 1`. Grain = one active, content-unique posting.
+- **`role_opportunity`** — the **decision mart**: per role, `demand_rank` + `job_count` +
+  `remote_pct` + the single `top_company` (most postings for that role). One table that answers
+  *"which role should I learn / apply for, how remote-friendly is it, and who hires for it?"* — the
+  layer a candidate actually decides on. Powers the [dashboard](#dashboard).
 - **`demand_by_role`** — classifies each posting into target roles and counts demand:
   1. `DEFAULT_ROLES` = 8 role families, each with lower-cased title substrings (e.g. *Data Engineer*
      ← `data engineer`, `etl engineer`, `analytics engineer`).
@@ -127,6 +133,10 @@ fact_job_posting   grain = one deduped active posting; measure posting_count = 1
   company, title, title_lower, location, is_remote, apply_url, posted_at, first_seen_at,
   last_seen_at, posting_count   + partition snapshot_date
 
+role_opportunity   grain = one (role, snapshot) pair   [decision mart]
+  demand_rank, role, job_count, remote_count, remote_pct, top_company, top_company_count
+                                + partition snapshot_date
+
 demand_by_role     grain = one (role, snapshot) pair
   role, job_count               + partition snapshot_date
 ```
@@ -141,11 +151,26 @@ history is a P2.5 extension.
 `StartCrawler` → **poll loop** `Wait 30s → GetCrawler → Choice(State == READY?)` (the crawler has no
 `.sync` integration, so it's polled). Any error is caught and routed to a `Failed` state.
 
+### Dashboard
+
+The `role_opportunity` mart drives a one-page **decision dashboard** — ranked role demand, remote
+share, and top employer per role, all queried from Athena. Since the pipeline is AWS-console-first
+(no app to run), the dashboard is a self-contained HTML page:
+[`docs/dashboard.html`](docs/dashboard.html) · live: <https://claude.ai/code/artifact/2b3e2547-4053-4204-8ee8-f122b262b98e>.
+
+### Tests — `tests/` (pytest + local SparkSession)
+
+The Glue-free transform functions are unit-tested on a real (local) SparkSession: `job_id` stability
+and within-source dedup, `dedup_hash` cross-source equality, role classification counts, and the
+`role_opportunity` decision columns. They run in CI ([`.github/workflows/tests.yml`](.github/workflows/tests.yml),
+Python 3.11 + Java 17) — `pip install -r requirements-dev.txt && pytest`.
+
 ### Verified end-to-end
 
-A full AWS run (snapshot 2026-06-30) landed **6,900** raw postings → **6,809** after cross-source
-dedup, across **161** companies, **~36% remote**; top role **Machine Learning Engineer (165)**. See
-[`docs/sample_results.md`](docs/sample_results.md) for the full Athena output.
+A full AWS run (snapshot 2026-07-28) landed ~6,900 raw postings → **9,206** after cross-source dedup
+(the lake accumulates snapshots), across **308** companies, **~35% remote**; top role **Machine
+Learning Engineer (207)**. See [`docs/sample_results.md`](docs/sample_results.md) for the full Athena
+output. *(The original 2026-06-30 run — 6,809 deduped — is kept there as the first documented run.)*
 
 ## Cost guardrails (read before `apply`)
 
@@ -209,8 +234,10 @@ Designed to run on the **Free Tier for cents**, but you control the spend:
 ## Layout
 
 ```
-infra/        Terraform — S3, IAM, Glue (jobs + crawler + catalog), Athena, Step Functions
-glue/jobs/    PySpark ETL: bronze_to_silver.py, silver_to_gold.py
+infra/        Terraform — S3, IAM, Glue (jobs + crawler + catalog), Athena, Step Functions, EventBridge
+glue/jobs/    PySpark ETL: bronze_to_silver.py (+ DQ gate), silver_to_gold.py (3 marts)
 ingestion/    land_to_bronze.py — pull ATS feeds -> S3 bronze
 sql/          athena_analysis.sql — example analytical queries
+tests/        pytest + local SparkSession unit tests for the transforms
+docs/         LEARN.md, architecture.md, sample_results.md, dashboard.html
 ```
