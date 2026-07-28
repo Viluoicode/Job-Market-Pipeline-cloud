@@ -29,3 +29,28 @@ def spark():
     session.sparkContext.setLogLevel("ERROR")
     yield session
     session.stop()
+
+
+# The Bronze record shape land_to_bronze.py writes (minus raw_json, which Silver drops). Declared
+# explicitly rather than inferred: a fixture column that is entirely NULL — e.g. an absent `remote`
+# flag — gives Spark nothing to infer from (CANNOT_DETERMINE_TYPE).
+BRONZE_COLUMNS = [
+    "source", "board_token", "source_job_id", "company", "title",
+    "location", "remote", "apply_url", "posted_at", "description",
+]
+
+
+@pytest.fixture(scope="session")
+def bronze(spark):
+    """Factory: rows (tuples in BRONZE_COLUMNS order) -> a raw Bronze DataFrame."""
+    from pyspark.sql.types import BooleanType, StringType, StructField, StructType
+
+    schema = StructType([
+        StructField(name, BooleanType() if name == "remote" else StringType(), nullable=True)
+        for name in BRONZE_COLUMNS
+    ])
+
+    def _make(rows):
+        return spark.createDataFrame(list(rows), schema=schema)
+
+    return _make
