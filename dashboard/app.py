@@ -208,13 +208,13 @@ else:
         plot_bgcolor="rgba(0,0,0,0)",
     )
     fig.update_xaxes(showgrid=True, gridcolor="rgba(128,128,128,.18)")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     with st.expander("Decision view — which role should I target? (`role_opportunity` mart)"):
         opp = load_opportunity(snapshot)
         st.dataframe(
             opp,
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
             column_config={
                 "demand_rank": st.column_config.NumberColumn("#", width="small"),
@@ -257,7 +257,7 @@ with left:
             plot_bgcolor="rgba(0,0,0,0)",
         )
         fig_c.update_xaxes(showgrid=True, gridcolor="rgba(128,128,128,.18)")
-        st.plotly_chart(fig_c, use_container_width=True)
+        st.plotly_chart(fig_c, width="stretch")
 
 with right:
     st.subheader("Remote vs on-site")
@@ -280,7 +280,7 @@ with right:
                  font_size=18, showarrow=False)
         ],
     )
-    st.plotly_chart(fig_r, use_container_width=True)
+    st.plotly_chart(fig_r, width="stretch")
 
 st.caption(
     f"Snapshot `{snapshot}` · every query filters on the `snapshot_date` partition "
