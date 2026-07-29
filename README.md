@@ -151,12 +151,28 @@ history is a P2.5 extension.
 `StartCrawler` → **poll loop** `Wait 30s → GetCrawler → Choice(State == READY?)` (the crawler has no
 `.sync` integration, so it's polled). Any error is caught and routed to a `Failed` state.
 
-### Dashboard
+### Serving layer — `dashboard/app.py` (Streamlit over Athena)
 
-The `role_opportunity` mart drives a one-page **decision dashboard** — ranked role demand, remote
-share, and top employer per role, all queried from Athena. Since the pipeline is AWS-console-first
-(no app to run), the dashboard is a self-contained HTML page:
-[`docs/dashboard.html`](docs/dashboard.html) · live: <https://claude.ai/code/artifact/2b3e2547-4053-4204-8ee8-f122b262b98e>.
+The Gold marts become charts a recruiter or curriculum lead can read. The app queries Athena live
+via `awswrangler`:
+
+```bash
+pip install -r dashboard/requirements.txt
+streamlit run dashboard/app.py          # http://localhost:8501
+```
+
+- **Config, not constants** — database / workgroup / region come from env vars
+  (`ATHENA_DATABASE`, `ATHENA_WORKGROUP`, `AWS_REGION`) with the current stack's values as
+  defaults. The results bucket is deliberately absent: the workgroup sets
+  `enforce_workgroup_configuration = true`, so Athena applies its own result location.
+- **Read-only** — `ctas_approach=False`; awswrangler's default would `CREATE TABLE AS SELECT`
+  (writing Parquet to S3 and registering a temp table).
+- **Cost-aware** — every query filters the `snapshot_date` partition, the KPI row is a single
+  combined query, and `@st.cache_data(ttl=900)` stops re-scanning on every rerender. A full page
+  load scans **~36 KB** (~$0.0000002).
+
+A static, self-contained variant of the same view is at [`docs/dashboard.html`](docs/dashboard.html)
+· live: <https://claude.ai/code/artifact/2b3e2547-4053-4204-8ee8-f122b262b98e>.
 
 ### Tests — `tests/` (pytest + local SparkSession)
 
@@ -239,5 +255,6 @@ glue/jobs/    PySpark ETL: bronze_to_silver.py (+ DQ gate), silver_to_gold.py (3
 ingestion/    land_to_bronze.py — pull ATS feeds -> S3 bronze
 sql/          athena_analysis.sql — example analytical queries
 tests/        pytest + local SparkSession unit tests for the transforms
+dashboard/    app.py — Streamlit serving layer reading Athena (+ requirements.txt)
 docs/         LEARN.md, architecture.md, sample_results.md, dashboard.html
 ```
