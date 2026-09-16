@@ -12,6 +12,7 @@ import pytest
 
 JOBS_DIR = Path(__file__).resolve().parent.parent / "glue" / "jobs"
 sys.path.insert(0, str(JOBS_DIR))
+sys.path.insert(0, str(JOBS_DIR.parent.parent / "ingestion"))
 
 
 @pytest.fixture(scope="session")
@@ -24,6 +25,7 @@ def spark():
         .config("spark.sql.shuffle.partitions", "1")
         .config("spark.ui.enabled", "false")
         .config("spark.sql.session.timeZone", "UTC")
+        .config("spark.sql.legacy.timeParserPolicy", "CORRECTED")
         .getOrCreate()
     )
     session.sparkContext.setLogLevel("ERROR")

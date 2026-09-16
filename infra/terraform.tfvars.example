@@ -9,3 +9,11 @@ alert_email = "you@example.com" # budget alert at 80% of $10/mo (put your real e
 # lake_bucket_name           = "my-jobmarket-lake"
 # athena_results_bucket_name = "my-jobmarket-athena"
 # scripts_bucket_name        = "my-jobmarket-scripts"
+
+# Enable only after an end-to-end run passes scripts/check_freshness.py.
+enable_schedule     = false
+schedule_expression = "cron(0 18 * * ? *)" # 01:00 UTC+7 the following day
+
+ingestion_min_success_ratio = 0.8
+freshness_hours             = 26
+stale_after_days           = 7

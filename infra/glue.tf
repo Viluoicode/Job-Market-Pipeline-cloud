@@ -15,6 +15,9 @@ locals {
     "--enable-metrics"                   = "true"
     "--enable-continuous-cloudwatch-log" = "true"
     "--job-bookmark-option"              = "job-bookmark-disable"
+    "--extra-py-files"                   = "s3://${aws_s3_bucket.scripts.bucket}/${aws_s3_object.pipeline_contract.key}"
+    "--stale_after_days"                 = tostring(var.stale_after_days)
+    "--freshness_hours"                  = tostring(var.freshness_hours)
   }
 }
 
@@ -25,6 +28,10 @@ resource "aws_glue_job" "bronze_to_silver" {
   worker_type       = var.glue_worker_type
   number_of_workers = var.glue_number_of_workers
   timeout           = var.glue_timeout_minutes
+  max_retries       = 0
+  execution_property {
+    max_concurrent_runs = 1
+  }
 
   command {
     name            = "glueetl"
@@ -43,6 +50,10 @@ resource "aws_glue_job" "silver_to_gold" {
   worker_type       = var.glue_worker_type
   number_of_workers = var.glue_number_of_workers
   timeout           = var.glue_timeout_minutes
+  max_retries       = 0
+  execution_property {
+    max_concurrent_runs = 1
+  }
 
   command {
     name            = "glueetl"

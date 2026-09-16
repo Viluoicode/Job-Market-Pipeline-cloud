@@ -1,0 +1,250 @@
+{
+  "verified_at": "2026-09-16T15:17:01.443091+00:00",
+  "execution": {
+    "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
+    "name": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
+    "status": "SUCCEEDED",
+    "startDate": "2026-09-16 01:00:16.275000+07:00",
+    "stopDate": "2026-09-16 01:07:29.609000+07:00"
+  },
+  "trigger_input": {
+    "version": "0",
+    "id": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9",
+    "detail-type": "Scheduled Event",
+    "source": "aws.events",
+    "account": "290488660407",
+    "time": "2026-09-15T18:00:00Z",
+    "region": "ap-southeast-1",
+    "resources": [
+      "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule"
+    ],
+    "detail": {}
+  },
+  "ingestion": {
+    "status": "SUCCEEDED",
+    "total_records": 7575,
+    "successful_boards": 36,
+    "failed_boards": 0,
+    "completed_at": "2026-09-15T18:01:37.547389+00:00",
+    "success_ratio": 1.0
+  },
+  "incomplete_boards": [
+    {
+      "source": "arbeitnow",
+      "board_token": "arbeitnow",
+      "status": "SUCCEEDED",
+      "complete": false,
+      "row_count": 500,
+      "key": "bronze/run_id=bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169/source=arbeitnow/board=arbeitnow/jobs.json",
+      "fetched_at": "2026-09-15T18:01:37.348798+00:00"
+    }
+  ],
+  "silver": {
+    "version": 1,
+    "run_id": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
+    "snapshot_date": "2026-09-15",
+    "observed_at": "2026-09-15T18:01:37.547389+00:00",
+    "row_count": 7731
+  },
+  "completion": {
+    "completed_at": "2026-09-15T18:07:29.317Z",
+    "run_id": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
+    "snapshot_date": "2026-09-15",
+    "started_at": "2026-09-15T18:00:16.275Z"
+  },
+  "jobs": {
+    "ingestion": {
+      "Id": "jr_e9638e1ac42525fd2fc94f755810ed4320a63030f11cec38d93c4148a63e52ea",
+      "JobRunState": "SUCCEEDED",
+      "StartedOn": "2026-09-16 01:00:16.590000+07:00",
+      "CompletedOn": "2026-09-16 01:01:47.962000+07:00",
+      "ExecutionTime": 52
+    },
+    "bronze-to-silver": {
+      "Id": "jr_16a66b0f46fc42e6c29a6f73d67c8e609f4fca5d05f1b0eef8bceb3b84ffd2fe",
+      "JobRunState": "SUCCEEDED",
+      "StartedOn": "2026-09-16 01:02:21.976000+07:00",
+      "CompletedOn": "2026-09-16 01:05:05.702000+07:00",
+      "ExecutionTime": 121
+    },
+    "silver-to-gold": {
+      "Id": "jr_01d9c9263f50760f682df2b4541adf1bcf004f29232ab9b9e0f46a04b5b17944",
+      "JobRunState": "SUCCEEDED",
+      "StartedOn": "2026-09-16 01:05:22.426000+07:00",
+      "CompletedOn": "2026-09-16 01:06:26.379000+07:00",
+      "ExecutionTime": 60
+    }
+  },
+  "queries": {
+    "overview": {
+      "id": "2f3c6552-7dd6-4db2-bdb6-f9c0ebf4b202",
+      "sql": "SELECT count(*) AS postings,count(DISTINCT company) AS companies,sum(if(is_remote,1,0)) AS remote_postings,round(100.0*sum(if(is_remote,1,0))/count(*),1) AS remote_pct,min(last_seen_at) AS oldest_observation,max(last_seen_at) AS newest_observation FROM fact_job_posting WHERE CAST(snapshot_date AS VARCHAR)='2026-09-15'",
+      "completed_at": "2026-09-16 22:11:11.196000+07:00",
+      "rows": [
+        {
+          "postings": "7583",
+          "companies": "309",
+          "remote_postings": "2499",
+          "remote_pct": "33.0",
+          "oldest_observation": "2026-09-15 14:12:24.397",
+          "newest_observation": "2026-09-15 18:01:37.348"
+        }
+      ]
+    },
+    "roles": {
+      "id": "699eca91-a31c-456f-a542-b7d81637b511",
+      "sql": "SELECT demand_rank,role,job_count,remote_pct,top_company,top_company_count FROM role_opportunity WHERE CAST(snapshot_date AS VARCHAR)='2026-09-15' ORDER BY demand_rank",
+      "completed_at": "2026-09-16 22:11:11.219000+07:00",
+      "rows": [
+        {
+          "demand_rank": "1",
+          "role": "Machine Learning Engineer",
+          "job_count": "174",
+          "remote_pct": "57.5",
+          "top_company": "OpenAI",
+          "top_company_count": "37"
+        },
+        {
+          "demand_rank": "2",
+          "role": "DevOps Engineer",
+          "job_count": "109",
+          "remote_pct": "22.0",
+          "top_company": "Palantir",
+          "top_company_count": "22"
+        },
+        {
+          "demand_rank": "3",
+          "role": "Data Scientist",
+          "job_count": "99",
+          "remote_pct": "48.5",
+          "top_company": "OpenAI",
+          "top_company_count": "17"
+        },
+        {
+          "demand_rank": "4",
+          "role": "Full Stack Engineer",
+          "job_count": "98",
+          "remote_pct": "33.7",
+          "top_company": "OpenAI",
+          "top_company_count": "17"
+        },
+        {
+          "demand_rank": "5",
+          "role": "Backend Engineer",
+          "job_count": "98",
+          "remote_pct": "48.0",
+          "top_company": "GitLab",
+          "top_company_count": "41"
+        },
+        {
+          "demand_rank": "6",
+          "role": "Data Engineer",
+          "job_count": "56",
+          "remote_pct": "48.2",
+          "top_company": "OpenAI",
+          "top_company_count": "9"
+        },
+        {
+          "demand_rank": "7",
+          "role": "Mobile Engineer",
+          "job_count": "35",
+          "remote_pct": "37.1",
+          "top_company": "Robinhood",
+          "top_company_count": "12"
+        },
+        {
+          "demand_rank": "8",
+          "role": "Frontend Engineer",
+          "job_count": "12",
+          "remote_pct": "41.7",
+          "top_company": "Reddit",
+          "top_company_count": "3"
+        }
+      ]
+    },
+    "partitions": {
+      "id": "62a03fce-d0d2-4e9e-bacc-1167e245e1ec",
+      "sql": "SELECT CAST(snapshot_date AS VARCHAR) AS snapshot_date,count(*) AS postings FROM fact_job_posting GROUP BY snapshot_date ORDER BY snapshot_date DESC LIMIT 6",
+      "completed_at": "2026-09-16 22:11:11.476000+07:00",
+      "rows": [
+        {
+          "snapshot_date": "2026-09-15",
+          "postings": "7583"
+        },
+        {
+          "snapshot_date": "2026-07-28",
+          "postings": "9206"
+        },
+        {
+          "snapshot_date": "2026-07-27",
+          "postings": "9206"
+        },
+        {
+          "snapshot_date": "2026-07-13",
+          "postings": "7834"
+        },
+        {
+          "snapshot_date": "2026-06-30",
+          "postings": "6809"
+        }
+      ]
+    }
+  },
+  "data_quality": {
+    "result_id": "dqresult-ed4b565508784c9476f0de6ac156b58a39316adf",
+    "score": 1.0,
+    "rules": [
+      {
+        "rule": "RowCount > 0",
+        "result": "PASS"
+      },
+      {
+        "rule": "IsComplete \"job_id\"",
+        "result": "PASS"
+      },
+      {
+        "rule": "IsUnique \"job_id\"",
+        "result": "PASS"
+      },
+      {
+        "rule": "IsComplete \"dedup_hash\"",
+        "result": "PASS"
+      },
+      {
+        "rule": "IsComplete \"is_remote\"",
+        "result": "PASS"
+      },
+      {
+        "rule": "ColumnValues \"source\" in [\"greenhouse\",\"lever\",\"ashby\",\"arbeitnow\"]",
+        "result": "PASS"
+      },
+      {
+        "rule": "Completeness \"company\" >= 0.9",
+        "result": "PASS"
+      }
+    ]
+  },
+  "schedule": {
+    "Name": "jobmarket-aws-pipeline-schedule",
+    "Arn": "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule",
+    "State": "ENABLED",
+    "ScheduleExpression": "cron(0 18 * * ? *)"
+  },
+  "crawler": {
+    "state": "READY",
+    "last_crawl": {
+      "Status": "SUCCEEDED",
+      "LogGroup": "/aws-glue/crawlers",
+      "LogStream": "jobmarket-aws-gold-crawler",
+      "MessagePrefix": "a4150231-16a9-47b0-8015-680f61b9cdbd",
+      "StartTime": "2026-09-16 01:06:28+07:00"
+    }
+  },
+  "lock": null,
+  "health": {
+    "healthy": true,
+    "ingestion_age_hours": 21.26,
+    "max_age_hours": 26,
+    "run_id": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169"
+  }
+}

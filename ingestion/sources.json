@@ -35,6 +35,6 @@
     { "source": "Ashby", "token": "cohere", "company": "Cohere" },
     { "source": "Ashby", "token": "supabase", "company": "Supabase" },
     { "source": "Ashby", "token": "zapier", "company": "Zapier" },
-    { "source": "Arbeitnow", "token": "global", "company": "Arbeitnow (aggregator)" }
+    { "source": "Arbeitnow", "token": "arbeitnow", "company": "Arbeitnow (aggregator)" }
   ]
 }

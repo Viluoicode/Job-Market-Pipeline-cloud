@@ -47,3 +47,11 @@ output "schedule_rule" {
   description = "EventBridge rule name + state for the scheduled pipeline run."
   value       = "${aws_cloudwatch_event_rule.pipeline.name} (${aws_cloudwatch_event_rule.pipeline.state})"
 }
+
+output "ingestion_job" {
+  value = aws_glue_job.ingestion.name
+}
+
+output "pipeline_lock_table" {
+  value = aws_dynamodb_table.pipeline_lock.name
+}

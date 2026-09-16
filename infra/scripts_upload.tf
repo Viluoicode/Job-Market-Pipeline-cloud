@@ -18,3 +18,11 @@ resource "aws_s3_object" "silver_to_gold" {
   etag         = filemd5("${path.module}/../glue/jobs/silver_to_gold.py")
   content_type = "text/x-python"
 }
+
+resource "aws_s3_object" "pipeline_contract" {
+  bucket       = aws_s3_bucket.scripts.id
+  key          = "jobs/pipeline_contract.py"
+  source       = "${path.module}/../glue/jobs/pipeline_contract.py"
+  etag         = filemd5("${path.module}/../glue/jobs/pipeline_contract.py")
+  content_type = "text/x-python"
+}

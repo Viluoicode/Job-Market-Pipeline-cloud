@@ -1,16 +1,20 @@
+-- Current-market consumers: first run scripts/check_freshness.py and require exit code 0.
+-- A MAX(snapshot_date) alone says which snapshot is newest, not whether it is fresh or published.
+-- The July 2026 legacy snapshots used accumulated input and synthetic last_seen_at timestamps.
+
 -- Athena analysis over the Gold marts (database: jobmarket_aws_gold).
 -- Console: pick the `jobmarket-aws` workgroup, then run these one at a time.
 -- Parquet + snapshot_date partitions keep every query well under 1 cent (the workgroup also
 -- caps each query at 10 GB scanned). Screenshot the results for your portfolio.
 
--- 0) THE DECISION QUERY — the role_opportunity mart in one shot: demand rank, remote share, and
+-- 0) THE DECISION QUERY â€” the role_opportunity mart in one shot: demand rank, remote share, and
 --    the top hiring company per role. This is what the dashboard renders.
 SELECT demand_rank, role, job_count, remote_pct, top_company, top_company_count
 FROM jobmarket_aws_gold.role_opportunity
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.role_opportunity)
 ORDER BY demand_rank;
 
--- 1) Headline leaderboard — demand by target role for the latest snapshot.
+-- 1) Headline leaderboard â€” demand by target role for the latest snapshot.
 SELECT role, job_count
 FROM jobmarket_aws_gold.demand_by_role
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.demand_by_role)
@@ -34,7 +38,7 @@ GROUP BY company
 ORDER BY postings DESC
 LIMIT 20;
 
--- 4) Where the postings come from — volume by source platform.
+-- 4) Where the postings come from â€” volume by source platform.
 SELECT source, count(*) AS postings
 FROM jobmarket_aws_gold.fact_job_posting
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
@@ -52,12 +56,12 @@ WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_jo
 GROUP BY source
 ORDER BY postings DESC;
 
--- 6) Demand trend over time — handy once you have more than one snapshot.
+-- 6) Demand trend over time â€” handy once you have more than one snapshot.
 SELECT snapshot_date, role, job_count
 FROM jobmarket_aws_gold.demand_by_role
 ORDER BY snapshot_date DESC, job_count DESC;
 
--- 7) The Data Engineer market (the role this portfolio targets) — sample of live postings.
+-- 7) The Data Engineer market (the role this portfolio targets) â€” sample of live postings.
 SELECT company, title, location, is_remote, apply_url
 FROM jobmarket_aws_gold.fact_job_posting
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)

@@ -22,14 +22,15 @@ SparkSession without AWS. ``main()`` wires them to Glue I/O.
 Args (Glue job parameters):
   --JOB_NAME       (provided by Glue)
   --LAKE_BUCKET    data lake bucket name
-  --snapshot_date  optional YYYY-MM-DD; defaults to today (UTC)
+  --snapshot_date  required execution UTC date
+  --run_id         required committed Silver run ID
 """
 
 import sys
-from datetime import datetime, timezone
 
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from pipeline_contract import read_json, silver_path, validate_manifest
 
 # Target role families and the lower-cased title substrings that classify a posting into each.
 # Port of SkillRadar domain/roles.py DEFAULT_ROLES (== transform/seeds/seed_roles.csv).
@@ -64,7 +65,7 @@ def build_fact(silver: DataFrame) -> DataFrame:
     """fact_job_posting: keep one representative per content hash (cross-source dedup) + enrich."""
     keep = Window.partitionBy("dedup_hash").orderBy("job_id")
     return (
-        silver.where(F.col("is_active"))
+        silver.where(F.col("is_active") & F.col("is_fresh"))
         .withColumn("_rn", F.row_number().over(keep))
         .where(F.col("_rn") == 1)
         .drop("_rn")
@@ -140,33 +141,41 @@ def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: 
 
 
 def main() -> None:
+    import boto3
     from awsglue.context import GlueContext
     from awsglue.job import Job
     from awsglue.utils import getResolvedOptions
     from pyspark.context import SparkContext
 
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET"])
-    snapshot_date = optional_arg("snapshot_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date"])
+    snapshot_date, run_id = args["snapshot_date"], args["run_id"]
     bucket = args["LAKE_BUCKET"]
+    s3 = boto3.client("s3")
+    manifest = read_json(s3, bucket, f"control/ingestion/run_id={run_id}/manifest.json")
+    validate_manifest(manifest, run_id, snapshot_date)
+    state = read_json(s3, bucket, "state/silver/latest.json")
+    if state["run_id"] != run_id or state["snapshot_date"] != snapshot_date:
+        raise ValueError("Gold requires Silver committed for this exact run")
 
     sc = SparkContext.getOrCreate()
     glue = GlueContext(sc)
     spark = glue.spark_session
+    spark.conf.set("spark.sql.session.timeZone", "UTC")
     spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
     job = Job(glue)
     job.init(args["JOB_NAME"], args)
 
-    silver_path = f"s3://{bucket}/silver/jobs/"
-    print(f"[silver_to_gold] reading {silver_path} (snapshot_date={snapshot_date})")
-    silver = spark.read.parquet(silver_path).where(
-        F.col("snapshot_date") == F.lit(snapshot_date).cast("date")
-    )
+    input_path = silver_path(bucket, run_id)
+    print(f"[silver_to_gold] reading {input_path} (snapshot_date={snapshot_date})")
+    silver = spark.read.parquet(input_path)
 
     # ---- fact_job_posting ----------------------------------------------------------------------
     fact = build_fact(silver).cache()
     print(f"[silver_to_gold] fact_job_posting rows (deduped): {fact.count()}")
     fact_path = f"s3://{bucket}/gold/fact_job_posting/"
-    (fact.write.mode("overwrite").partitionBy("snapshot_date").parquet(fact_path))
+    # Overwrite the exact daily partition, including when a mart becomes empty on rerun.
+    # Dynamic partition overwrite would leave the previous nonempty data in that case.
+    (fact.drop("snapshot_date").write.mode("overwrite").parquet(f"{fact_path}snapshot_date={snapshot_date}/"))
     print(f"[silver_to_gold] wrote {fact_path}")
 
     roles_df = make_roles_df(spark)
@@ -174,13 +183,13 @@ def main() -> None:
     # ---- demand_by_role ------------------------------------------------------------------------
     demand = build_demand_by_role(fact, roles_df, snapshot_date)
     demand_path = f"s3://{bucket}/gold/demand_by_role/"
-    (demand.write.mode("overwrite").partitionBy("snapshot_date").parquet(demand_path))
+    (demand.drop("snapshot_date").write.mode("overwrite").parquet(f"{demand_path}snapshot_date={snapshot_date}/"))
     print(f"[silver_to_gold] wrote {demand_path}")
 
     # ---- role_opportunity (decision mart) ------------------------------------------------------
     opportunity = build_role_opportunity(fact, roles_df, snapshot_date)
     opp_path = f"s3://{bucket}/gold/role_opportunity/"
-    (opportunity.write.mode("overwrite").partitionBy("snapshot_date").parquet(opp_path))
+    (opportunity.drop("snapshot_date").write.mode("overwrite").parquet(f"{opp_path}snapshot_date={snapshot_date}/"))
     print(f"[silver_to_gold] wrote {opp_path}")
     for row in opportunity.collect():
         print(

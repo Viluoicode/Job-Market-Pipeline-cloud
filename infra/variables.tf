@@ -111,3 +111,33 @@ variable "schedule_expression" {
   type        = string
   default     = "cron(0 18 * * ? *)"
 }
+
+variable "ingestion_min_success_ratio" {
+  description = "Minimum successful board fraction before publishing a run manifest."
+  type        = number
+  default     = 0.8
+  validation {
+    condition     = var.ingestion_min_success_ratio > 0 && var.ingestion_min_success_ratio <= 1
+    error_message = "Success ratio must be in (0, 1]."
+  }
+}
+
+variable "stale_after_days" {
+  description = "Expire unverified postings after this many days without an observation."
+  type        = number
+  default     = 7
+  validation {
+    condition     = var.stale_after_days >= 1 && floor(var.stale_after_days) == var.stale_after_days
+    error_message = "stale_after_days must be a positive integer."
+  }
+}
+
+variable "freshness_hours" {
+  description = "Gold excludes postings last observed more than this many hours before ingestion completion."
+  type        = number
+  default     = 26
+  validation {
+    condition     = var.freshness_hours >= 1 && floor(var.freshness_hours) == var.freshness_hours
+    error_message = "freshness_hours must be a positive integer."
+  }
+}

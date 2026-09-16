@@ -1,0 +1,440 @@
+{
+  "execution": {
+    "run_id": "lifecycle-verify-20260915-1413",
+    "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:lifecycle-verify-20260915-1413",
+    "execution": {
+      "status": "SUCCEEDED",
+      "startDate": "2026-09-15 21:11:27.442000+07:00",
+      "stopDate": "2026-09-15 21:18:12.615000+07:00",
+      "error": null,
+      "cause": null
+    },
+    "jobs": {
+      "ingestion": {
+        "Id": "jr_6c8f622afdedb78d026f47508d12203d3d54f0cc773170464d8207fbb16f4583",
+        "JobRunState": "SUCCEEDED",
+        "StartedOn": "2026-09-15 21:11:27.683000+07:00",
+        "CompletedOn": "2026-09-15 21:12:34.982000+07:00",
+        "ExecutionTime": 61,
+        "ErrorMessage": null
+      },
+      "bronze-to-silver": {
+        "Id": "jr_bb85f808e58cdbb9d2d1bdd2130f53ff919a877ede89b23ea2c86ecb19feba28",
+        "JobRunState": "SUCCEEDED",
+        "StartedOn": "2026-09-15 21:13:23.032000+07:00",
+        "CompletedOn": "2026-09-15 21:15:06.189000+07:00",
+        "ExecutionTime": 97,
+        "ErrorMessage": null
+      },
+      "silver-to-gold": {
+        "Id": "jr_dccbff17e7b95003b7c177acb1b2bce5a5dea6b3b94287c01db382a22be55e6b",
+        "JobRunState": "SUCCEEDED",
+        "StartedOn": "2026-09-15 21:15:14.384000+07:00",
+        "CompletedOn": "2026-09-15 21:16:20.582000+07:00",
+        "ExecutionTime": 62,
+        "ErrorMessage": null
+      }
+    },
+    "ingestion": {
+      "status": "SUCCEEDED",
+      "snapshot_date": "2026-09-15",
+      "started_at": "2026-09-15T14:11:39.717694+00:00",
+      "completed_at": "2026-09-15T14:12:24.592677+00:00",
+      "total_records": 7578,
+      "successful_boards": 36,
+      "failed_boards": 0,
+      "success_ratio": 1.0,
+      "incomplete_boards": [
+        "arbeitnow/arbeitnow"
+      ],
+      "failed": []
+    },
+    "silver_state": {
+      "version": 1,
+      "run_id": "lifecycle-verify-20260915-1413",
+      "snapshot_date": "2026-09-15",
+      "observed_at": "2026-09-15T14:12:24.592677+00:00",
+      "row_count": 7612
+    },
+    "pipeline_state": {
+      "completed_at": "2026-09-15T14:18:12.302Z",
+      "run_id": "lifecycle-verify-20260915-1413",
+      "snapshot_date": "2026-09-15",
+      "started_at": "2026-09-15T14:11:27.442Z"
+    }
+  },
+  "athena": {
+    "completion": {
+      "completed_at": "2026-09-15T14:18:12.302Z",
+      "run_id": "lifecycle-verify-20260915-1413",
+      "snapshot_date": "2026-09-15",
+      "started_at": "2026-09-15T14:11:27.442Z"
+    },
+    "silver": {
+      "version": 1,
+      "run_id": "lifecycle-verify-20260915-1413",
+      "snapshot_date": "2026-09-15",
+      "observed_at": "2026-09-15T14:12:24.592677+00:00",
+      "row_count": 7612
+    },
+    "queries": {
+      "overview": {
+        "id": "179888f8-9eb7-40da-8105-7e2b43659e27",
+        "state": "SUCCEEDED",
+        "bytes_scanned": 28233,
+        "rows": [
+          {
+            "postings": "7510",
+            "companies": "270",
+            "remote_postings": "2496",
+            "remote_pct": "33.2",
+            "earliest_first_seen": "2026-09-15 14:01:48.203",
+            "oldest_observation": "2026-09-15 14:02:56.799",
+            "newest_observation": "2026-09-15 14:12:24.397"
+          }
+        ]
+      },
+      "roles": {
+        "id": "2bba1a7a-f352-4228-ad5d-9afcbbe024f6",
+        "state": "SUCCEEDED",
+        "bytes_scanned": 573,
+        "rows": [
+          {
+            "demand_rank": "1",
+            "role": "Machine Learning Engineer",
+            "job_count": "176",
+            "remote_pct": "57.4",
+            "top_company": "OpenAI",
+            "top_company_count": "37"
+          },
+          {
+            "demand_rank": "2",
+            "role": "DevOps Engineer",
+            "job_count": "109",
+            "remote_pct": "22.0",
+            "top_company": "Palantir",
+            "top_company_count": "22"
+          },
+          {
+            "demand_rank": "3",
+            "role": "Data Scientist",
+            "job_count": "100",
+            "remote_pct": "49.0",
+            "top_company": "OpenAI",
+            "top_company_count": "18"
+          },
+          {
+            "demand_rank": "4",
+            "role": "Full Stack Engineer",
+            "job_count": "97",
+            "remote_pct": "34.0",
+            "top_company": "OpenAI",
+            "top_company_count": "17"
+          },
+          {
+            "demand_rank": "5",
+            "role": "Backend Engineer",
+            "job_count": "96",
+            "remote_pct": "49.0",
+            "top_company": "GitLab",
+            "top_company_count": "41"
+          },
+          {
+            "demand_rank": "6",
+            "role": "Data Engineer",
+            "job_count": "57",
+            "remote_pct": "49.1",
+            "top_company": "OpenAI",
+            "top_company_count": "9"
+          },
+          {
+            "demand_rank": "7",
+            "role": "Mobile Engineer",
+            "job_count": "35",
+            "remote_pct": "37.1",
+            "top_company": "Robinhood",
+            "top_company_count": "12"
+          },
+          {
+            "demand_rank": "8",
+            "role": "Frontend Engineer",
+            "job_count": "12",
+            "remote_pct": "41.7",
+            "top_company": "Reddit",
+            "top_company_count": "3"
+          }
+        ]
+      },
+      "data_engineer_examples": {
+        "id": "1f9897ea-affb-46f9-98c5-6d4f44b94c2e",
+        "state": "SUCCEEDED",
+        "bytes_scanned": 371849,
+        "rows": [
+          {
+            "company": "Airbnb",
+            "title": "Senior Staff Data Engineer - Data Stewardship",
+            "location": "United States",
+            "is_remote": "false",
+            "apply_url": "https://careers.airbnb.com/positions/7998356?gh_jid=7998356"
+          },
+          {
+            "company": "Aircall",
+            "title": "Senior Data Engineer - Real time analytics",
+            "location": "France Remote",
+            "is_remote": "false",
+            "apply_url": "https://www.arbeitnow.fr/jobs/companies/aircall/remote-senior-data-engineer-real-time-analytics-151340"
+          },
+          {
+            "company": "Aircall",
+            "title": "Senior Data Engineer - Real time analytics",
+            "location": "Paris Office",
+            "is_remote": "false",
+            "apply_url": "https://www.arbeitnow.fr/jobs/companies/aircall/senior-data-engineer-real-time-analytics-paris-office-408462"
+          },
+          {
+            "company": "Asana",
+            "title": "Data Engineer ",
+            "location": "Warsaw",
+            "is_remote": "false",
+            "apply_url": "https://www.asana.com/jobs/apply/8131896?gh_jid=8131896"
+          },
+          {
+            "company": "Asana",
+            "title": "Senior Data Engineer",
+            "location": "Vancouver, BC",
+            "is_remote": "false",
+            "apply_url": "https://www.asana.com/jobs/apply/7859222?gh_jid=7859222"
+          }
+        ]
+      },
+      "marts_consistent": {
+        "id": "fdbd5314-a9d7-471b-aaf8-37bf8a65fc9d",
+        "state": "SUCCEEDED",
+        "bytes_scanned": 1673,
+        "rows": [
+          {
+            "mismatches": "0"
+          }
+        ]
+      }
+    },
+    "crawler": {
+      "state": "READY",
+      "last_crawl": {
+        "Status": "SUCCEEDED",
+        "LogGroup": "/aws-glue/crawlers",
+        "LogStream": "jobmarket-aws-gold-crawler",
+        "MessagePrefix": "d2ab92b4-af09-43c7-9940-b4e0c1876bde",
+        "StartTime": "2026-09-15 21:17:11+07:00"
+      }
+    },
+    "lock": null
+  },
+  "lifecycle": {
+    "previous_run": "ingestion-verify-20260915-1403",
+    "current_run": "lifecycle-verify-20260915-1413",
+    "previous_rows": 7571,
+    "current_rows": 7612,
+    "matched": 7571,
+    "first_seen_changed": 0,
+    "last_seen_regressed": 0,
+    "observed_again": 7537,
+    "new_identities": 41,
+    "dropped_history": 0,
+    "status_counts": [
+      {
+        "status_reason": "observed",
+        "is_active": true,
+        "is_fresh": true,
+        "count": 7578
+      },
+      {
+        "status_reason": "board_unverified",
+        "is_active": true,
+        "is_fresh": true,
+        "count": 34
+      }
+    ]
+  },
+  "health": {
+    "healthy": true,
+    "reason": "fresh",
+    "run_id": "lifecycle-verify-20260915-1413",
+    "snapshot_date": "2026-09-15",
+    "ingested_at": "2026-09-15T14:12:24.592677+00:00",
+    "published_at": "2026-09-15T14:18:12.302Z",
+    "ingestion_age_hours": 0.11,
+    "rows_ingested": 7578,
+    "successful_boards": 36,
+    "failed_boards": 0,
+    "incomplete_boards": 1
+  },
+  "schedule": {
+    "verified_at": "2026-09-15T14:19:57.769281+00:00",
+    "rule": {
+      "Name": "jobmarket-aws-pipeline-schedule",
+      "Arn": "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule",
+      "ScheduleExpression": "cron(0 18 * * ? *)",
+      "State": "ENABLED",
+      "Description": "Scheduled trigger for the job-market pipeline (disabled by default).",
+      "EventBusName": "default",
+      "CreatedBy": "290488660407"
+    },
+    "targets": [
+      {
+        "Id": "terraform-20260727130055531500000001",
+        "Arn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+        "RoleArn": "arn:aws:iam::290488660407:role/jobmarket-aws-events-role"
+      }
+    ],
+    "target_permission": [
+      {
+        "EvalActionName": "states:StartExecution",
+        "EvalResourceName": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+        "EvalDecision": "allowed"
+      }
+    ],
+    "first_expected_tick_local": "2026-09-16T01:00:00+07:00",
+    "scheduled_tick_observed": false
+  },
+  "data_quality": {
+    "ResultId": "dqresult-c70cedaa9be2e0df8c442462bb95af28f606704d",
+    "JobName": "jobmarket-aws-bronze-to-silver",
+    "JobRunId": "jr_bb85f808e58cdbb9d2d1bdd2130f53ff919a877ede89b23ea2c86ecb19feba28",
+    "Score": 1.0,
+    "RuleResults": [
+      {
+        "Name": "Rule_1",
+        "Description": "RowCount > 0",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Dataset.*.RowCount": 7612.0
+        },
+        "EvaluatedRule": "RowCount > 0"
+      },
+      {
+        "Name": "Rule_2",
+        "Description": "IsComplete \"job_id\"",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.job_id.Completeness": 1.0
+        },
+        "EvaluatedRule": "IsComplete \"job_id\""
+      },
+      {
+        "Name": "Rule_3",
+        "Description": "IsUnique \"job_id\"",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.job_id.Uniqueness": 1.0
+        },
+        "EvaluatedRule": "IsUnique \"job_id\""
+      },
+      {
+        "Name": "Rule_4",
+        "Description": "IsComplete \"dedup_hash\"",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.dedup_hash.Completeness": 1.0
+        },
+        "EvaluatedRule": "IsComplete \"dedup_hash\""
+      },
+      {
+        "Name": "Rule_5",
+        "Description": "IsComplete \"is_remote\"",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.is_remote.Completeness": 1.0
+        },
+        "EvaluatedRule": "IsComplete \"is_remote\""
+      },
+      {
+        "Name": "Rule_6",
+        "Description": "ColumnValues \"source\" in [\"greenhouse\",\"lever\",\"ashby\",\"arbeitnow\"]",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.source.ColumnValues.Compliance": 1.0
+        },
+        "EvaluatedRule": "ColumnValues \"source\" in [\"greenhouse\",\"lever\",\"ashby\",\"arbeitnow\"]"
+      },
+      {
+        "Name": "Rule_7",
+        "Description": "Completeness \"company\" >= 0.9",
+        "Result": "PASS",
+        "EvaluatedMetrics": {
+          "Column.company.Completeness": 1.0
+        },
+        "EvaluatedRule": "Completeness \"company\" >= 0.9"
+      }
+    ]
+  },
+  "storage_lifecycle": {
+    "lake": [
+      {
+        "Expiration": {
+          "Days": 30
+        },
+        "ID": "expire-raw-bronze",
+        "Filter": {
+          "Prefix": "bronze/"
+        },
+        "Status": "Enabled"
+      },
+      {
+        "Expiration": {
+          "Days": 30
+        },
+        "ID": "expire-ingestion-manifests",
+        "Filter": {
+          "Prefix": "control/ingestion/"
+        },
+        "Status": "Enabled"
+      },
+      {
+        "Expiration": {
+          "Days": 90
+        },
+        "ID": "expire-quality-audits",
+        "Filter": {
+          "Prefix": "quality/"
+        },
+        "Status": "Enabled"
+      }
+    ],
+    "scripts": [
+      {
+        "Expiration": {
+          "Days": 7
+        },
+        "ID": "expire-glue-temp",
+        "Filter": {
+          "Prefix": "tmp/"
+        },
+        "Status": "Enabled",
+        "AbortIncompleteMultipartUpload": {
+          "DaysAfterInitiation": 1
+        }
+      }
+    ],
+    "athena": [
+      {
+        "Expiration": {
+          "Days": 7
+        },
+        "ID": "expire-athena-results",
+        "Filter": {
+          "Prefix": "results/"
+        },
+        "Status": "Enabled"
+      }
+    ]
+  },
+  "local_validation": {
+    "pytest": {
+      "passed": 44,
+      "duration_seconds": 51.17
+    },
+    "terraform_fmt": "PASS",
+    "terraform_validate": "PASS"
+  }
+}

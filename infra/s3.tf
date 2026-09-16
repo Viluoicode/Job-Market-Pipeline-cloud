@@ -38,6 +38,26 @@ resource "aws_s3_bucket_lifecycle_configuration" "lake" {
       days = var.bronze_expiration_days
     }
   }
+  rule {
+    id     = "expire-ingestion-manifests"
+    status = "Enabled"
+    filter {
+      prefix = "control/ingestion/"
+    }
+    expiration {
+      days = var.bronze_expiration_days
+    }
+  }
+  rule {
+    id     = "expire-quality-audits"
+    status = "Enabled"
+    filter {
+      prefix = "quality/"
+    }
+    expiration {
+      days = 90
+    }
+  }
 }
 
 # ---- Athena results ------------------------------------------------------------------------
@@ -96,6 +116,23 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "scripts" {
   rule {
     apply_server_side_encryption_by_default {
       sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "scripts" {
+  bucket = aws_s3_bucket.scripts.id
+  rule {
+    id     = "expire-glue-temp"
+    status = "Enabled"
+    filter {
+      prefix = "tmp/"
+    }
+    expiration {
+      days = 7
+    }
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
     }
   }
 }

@@ -1,12 +1,11 @@
 """Glue (PySpark) — Bronze -> Silver.
 
-Reads raw newline-delimited JSON from ``s3://<LAKE_BUCKET>/bronze/`` (landed by
-``ingestion/land_to_bronze.py``), types the columns, computes the stable surrogate key and the
-cross-source content dedup hash, then writes typed, deduped Parquet to
-``s3://<LAKE_BUCKET>/silver/jobs/snapshot_date=<YYYY-MM-DD>/``.
+Reads only the current ingestion manifest's Bronze objects, validates their freshness and
+coverage, and reconciles posting lifecycle with the previous committed Silver run. Publishes
+typed, deduped Parquet to ``s3://<LAKE_BUCKET>/silver/runs/<run_id>/jobs/`` after enforced DQ.
 
 This is the cloud/Spark equivalent of SkillRadar's Bronze->Silver step:
-  * ``job_id``     = SHA-256(source | source_job_id)              (port of dedup.make_job_id)
+  * ``job_id``     = SHA-256(source | board_token | source_job_id)              (port of dedup.make_job_id)
   * ``dedup_hash`` = SHA-256(norm(company) | norm(title) | norm(location)).upper()
                                                                   (port of dedup.compute_dedup_hash)
   * ``norm`` lower-cases, strips punctuation to spaces, collapses whitespace
@@ -20,14 +19,16 @@ module for testing needs only ``pyspark``.
 Args (Glue job parameters):
   --JOB_NAME       (provided by Glue)
   --LAKE_BUCKET    data lake bucket name
-  --snapshot_date  optional YYYY-MM-DD; defaults to today (UTC)
+  --snapshot_date  required: execution UTC date
+  --run_id         required: committed ingestion run ID
 """
 
+import json
 import sys
-from datetime import datetime, timezone
 
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
+from pipeline_contract import read_json, silver_path, timestamp, validate_manifest
 
 
 # Data Quality gate on the Silver table — the cloud/Glue parallel of SkillRadar's dbt tests
@@ -45,7 +46,7 @@ DQ_RULESET = """Rules = [
 ]"""
 
 
-def run_data_quality(glue, df, bucket, snapshot_date, enforce=True):
+def run_data_quality(glue, df, bucket, snapshot_date, enforce=True, run_id=None):
     """Evaluate DQ_RULESET against the Silver DataFrame.
 
     Publishes results to the Glue Data Quality console + CloudWatch, persists the per-rule
@@ -73,7 +74,7 @@ def run_data_quality(glue, df, bucket, snapshot_date, enforce=True):
     print("[dq] per-rule outcomes:")
     outcomes.select("Rule", "Outcome", "FailureReason").show(50, truncate=False)
 
-    quality_path = f"s3://{bucket}/quality/silver_jobs/"
+    quality_path = f"s3://{bucket}/quality/silver_jobs/{run_id or snapshot_date}/"
     (
         outcomes.withColumn("snapshot_date", F.lit(snapshot_date).cast("date"))
         .write.mode("overwrite")
@@ -125,7 +126,8 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
 
     Pure PySpark (no Glue) so it is unit-testable on a local SparkSession.
     """
-    now_ts = F.current_timestamp()
+    # Production always supplies fetched_at. The fallback keeps offline fixtures deterministic.
+    observed_ts = parse_ts("fetched_at") if "fetched_at" in raw.columns else F.lit(snapshot_date).cast("timestamp")
     typed = (
         raw.select(
             F.col("source").cast("string").alias("source"),
@@ -138,24 +140,27 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
             F.col("apply_url").cast("string").alias("apply_url"),
             parse_ts("posted_at").alias("posted_at"),
             F.col("description").cast("string").alias("description"),
+            observed_ts.alias("observed_at"),
         )
         .where(F.col("source_job_id").isNotNull() & (F.col("source_job_id") != ""))
         .withColumn(
             "job_id",
-            F.lower(F.sha2(F.concat_ws("|", F.col("source"), F.col("source_job_id")), 256)),
+            F.lower(F.sha2(F.concat_ws("|", F.col("source"), F.col("board_token"), F.col("source_job_id")), 256)),
         )
         .withColumn(
             "dedup_hash",
             F.upper(F.sha2(F.concat_ws("|", norm("company"), norm("title"), norm("location")), 256)),
         )
-        .withColumn("first_seen_at", now_ts)
-        .withColumn("last_seen_at", now_ts)
+        .withColumn("first_seen_at", F.col("observed_at"))
+        .withColumn("last_seen_at", F.col("observed_at"))
         .withColumn("is_active", F.lit(True))
+        .withColumn("is_fresh", F.lit(True))
+        .withColumn("status_reason", F.lit("observed"))
         .withColumn("snapshot_date", F.lit(snapshot_date).cast("date"))
     )
 
     # One row per posting: keep the most recently posted record for each job_id.
-    keep = Window.partitionBy("job_id").orderBy(F.col("posted_at").desc_nulls_last())
+    keep = Window.partitionBy("job_id").orderBy(F.col("last_seen_at").desc(), F.col("posted_at").desc_nulls_last())
     return (
         typed.withColumn("_rn", F.row_number().over(keep))
         .where(F.col("_rn") == 1)
@@ -163,57 +168,107 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
         .select(
             "job_id", "source", "source_job_id", "board_token", "company", "title",
             "location", "is_remote", "apply_url", "posted_at", "dedup_hash",
-            "first_seen_at", "last_seen_at", "is_active", "description", "snapshot_date",
+            "first_seen_at", "last_seen_at", "is_active", "is_fresh", "status_reason", "description", "snapshot_date",
         )
     )
 
 
+def reconcile_lifecycle(current, previous, complete_boards, observed_at,
+                        stale_after_days=7, freshness_hours=26):
+    """Carry history forward without treating failed/truncated feeds as closed postings."""
+    if stale_after_days < 1 or freshness_hours <= 0:
+        raise ValueError("Lifecycle and freshness windows must be positive")
+    if previous is None:
+        return current
+    old_seen = previous.select("job_id", F.col("first_seen_at").alias("old_first_seen"))
+    observed = (current.join(old_seen, "job_id", "left")
+                .withColumn("first_seen_at", F.coalesce("old_first_seen", "first_seen_at"))
+                .drop("old_first_seen"))
+    missing = previous.join(current.select("job_id"), "job_id", "left_anti")
+    boards = current.sparkSession.createDataFrame(
+        list(complete_boards), "source string, board_token string"
+    ).withColumn("board_complete", F.lit(True))
+    missing = missing.join(F.broadcast(boards), ["source", "board_token"], "left")
+    clock = F.lit(observed_at).cast("timestamp")
+    too_old = F.col("last_seen_at") < clock - F.expr(f"INTERVAL {int(stale_after_days)} DAYS")
+    missing = (missing
+        .withColumn("status_reason", F.when(~F.col("is_active"), F.col("status_reason"))
+                    .when(F.col("board_complete"), "absent_from_complete_board")
+                    .when(too_old, "stale_observation").otherwise("board_unverified"))
+        .withColumn("is_active", F.col("is_active") & ~F.coalesce("board_complete", F.lit(False)) & ~too_old)
+        .withColumn("is_fresh", F.col("last_seen_at") >= clock - F.expr(f"INTERVAL {int(freshness_hours)} HOURS"))
+        .withColumn("snapshot_date", F.to_date(clock))
+        .drop("board_complete"))
+    return observed.unionByName(missing)
+
+
+def validate_observations(raw, manifest):
+    """Check every board count and observation identity before normalization can drop rows."""
+    invalid = (F.col("source_job_id").isNull() | (F.trim(F.col("source_job_id")) == "") |
+               F.col("run_id").isNull() | (F.col("run_id") != manifest["run_id"]) |
+               parse_ts("fetched_at").isNull())
+    if raw.where(invalid).limit(1).count():
+        raise ValueError("Invalid job identity or observation metadata in Bronze")
+    counts = raw.groupBy("source", "board_token", "fetched_at").count().collect()
+    actual = {(r.source, r.board_token, r.fetched_at): r['count'] for r in counts}
+    expected = {(b["source"], b["board_token"], b["fetched_at"]): b["row_count"]
+                for b in manifest["boards"] if b["status"] == "SUCCEEDED" and b["row_count"]}
+    if actual != expected:
+        raise ValueError("Bronze board counts/timestamps differ from the ingestion manifest")
+
+
 def main() -> None:
+    import boto3
     from awsglue.context import GlueContext
     from awsglue.job import Job
     from awsglue.utils import getResolvedOptions
     from pyspark.context import SparkContext
 
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET"])
-    snapshot_date = optional_arg("snapshot_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
-    bucket = args["LAKE_BUCKET"]
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date"])
+    bucket, run_id, snapshot_date = args["LAKE_BUCKET"], args["run_id"], args["snapshot_date"]
+    s3 = boto3.client("s3")
+    manifest = read_json(s3, bucket, f"control/ingestion/run_id={run_id}/manifest.json")
+    keys, complete_boards = validate_manifest(manifest, run_id, snapshot_date,
+        max_age_hours=float(optional_arg("max_ingestion_age_hours", "24")))
+    previous_state = read_json(s3, bucket, "state/silver/latest.json", optional=True)
+    if previous_state and previous_state["run_id"] != run_id and (
+            timestamp(previous_state["observed_at"]) >= timestamp(manifest["completed_at"])):
+        raise ValueError("Cannot overwrite lifecycle state with an older ingestion run")
 
-    sc = SparkContext.getOrCreate()
-    glue = GlueContext(sc)
+    glue = GlueContext(SparkContext.getOrCreate())
     spark = glue.spark_session
-    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
+    spark.conf.set("spark.sql.session.timeZone", "UTC")
+    spark.conf.set("spark.sql.legacy.timeParserPolicy", "CORRECTED")
     job = Job(glue)
     job.init(args["JOB_NAME"], args)
+    if previous_state and previous_state["run_id"] == run_id:
+        # A committed run is immutable. Redrive may safely resume Gold without rewriting it.
+        print(f"[silver] run {run_id} already committed")
+        job.commit()
+        return
 
-    bronze_path = f"s3://{bucket}/bronze/"
-    print(f"[bronze_to_silver] reading {bronze_path} (snapshot_date={snapshot_date})")
-
-    # recursiveFileLookup: read every jobs.json under bronze/ and take `source` from the record
-    # body (not the partition dir), so it never clashes with the `source=` path column.
-    raw = (
-        spark.read.option("recursiveFileLookup", "true")
-        .option("mode", "PERMISSIVE")
-        .json(bronze_path)
-    )
-
-    silver = build_silver(raw, snapshot_date)
-
-    # Data Quality gate: assert Silver invariants before publishing (set --dq_enforce false to
-    # log-only instead of failing the job).
-    enforce = optional_arg("dq_enforce", "true").strip().lower() not in ("false", "0", "no")
-    print(f"[bronze_to_silver] running data quality on Silver (enforce={enforce})")
-    run_data_quality(glue, silver, bucket, snapshot_date, enforce=enforce)
-
-    out_path = f"s3://{bucket}/silver/jobs/"
-    print(f"[bronze_to_silver] writing Parquet -> {out_path} (partition snapshot_date={snapshot_date})")
-    (
-        silver.write.mode("overwrite")
-        .partitionBy("snapshot_date")
-        .parquet(out_path)
-    )
-
+    from pyspark.sql.types import BooleanType, StringType, StructField, StructType
+    columns = ["source", "board_token", "source_job_id", "company", "title", "location",
+               "remote", "description", "apply_url", "posted_at", "run_id", "fetched_at"]
+    schema = StructType([StructField(c, BooleanType() if c == "remote" else StringType()) for c in columns])
+    raw = spark.read.schema(schema).option("mode", "FAILFAST").json([f"s3://{bucket}/{key}" for key in keys]).cache()
+    validate_observations(raw, manifest)
+    current = build_silver(raw, snapshot_date)
+    # Legacy July snapshots have synthetic last_seen timestamps: they are not lifecycle evidence.
+    previous = spark.read.parquet(silver_path(bucket, previous_state["run_id"])) if previous_state else None
+    silver = reconcile_lifecycle(current, previous, complete_boards, manifest["completed_at"],
+        stale_after_days=int(optional_arg("stale_after_days", "7")),
+        freshness_hours=int(optional_arg("freshness_hours", "26")))
+    silver = silver.withColumn("snapshot_date", F.lit(snapshot_date).cast("date")).cache()
+    run_data_quality(glue, silver, bucket, snapshot_date, enforce=True, run_id=run_id)
+    silver.write.mode("overwrite").parquet(silver_path(bucket, run_id))
+    # The pipeline-wide DynamoDB lock serializes this pointer; it has no S3 expiration rule.
+    state = {"version": 1, "run_id": run_id, "snapshot_date": snapshot_date,
+             "observed_at": manifest["completed_at"], "row_count": silver.count()}
+    s3.put_object(Bucket=bucket, Key="state/silver/latest.json",
+                  Body=json.dumps(state).encode("utf-8"), ContentType="application/json")
     job.commit()
-    print("[bronze_to_silver] done")
+    print(f"[silver] committed {state}")
 
 
 if __name__ == "__main__":

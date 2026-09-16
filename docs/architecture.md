@@ -1,117 +1,71 @@
-# Architecture — Job Market AWS Pipeline (P2)
+# Architecture — Job Market AWS Pipeline
 
-A cloud-native rebuild of the **SkillRadar** Medallion pipeline (local DuckDB + dbt + Streamlit)
-on AWS, provisioned end-to-end with **Terraform**. Same domain — tech job postings pulled from
-public ATS feeds — but the storage, compute, catalog, query and orchestration layers are all
-managed AWS services. Building the *same* pipeline two ways is the point: it shows the tradeoffs
-between a local lakehouse and a cloud-native one.
-
-## Flow
+Deployment observations and operational procedures live in [operations.md](operations.md).
+The workflow below was deployed and verified end to end on 2026-09-15. The daily EventBridge
+schedule is enabled at 01:00 UTC+7; execution does not depend on a local machine.
+The first EventBridge-triggered run succeeded on 2026-09-16 at 01:00–01:07 UTC+7;
+[its recorded input and results](evidence/scheduled-run-20260916.json) verify automatic delivery.
+Partition dates follow UTC, so that run publishes `snapshot_date=2026-09-15`.
 
 ```mermaid
-flowchart TB
-    ATS["Greenhouse · Lever · Ashby · Arbeitnow<br/>(public ATS APIs — no keys)"]
-
-    subgraph lake["S3 data lake (one bucket, three zones)"]
-        BRONZE["<b>bronze/</b><br/>raw ndjson<br/>source=…/date=…"]
-        SILVER["<b>silver/jobs/</b><br/>typed + cross-source deduped Parquet<br/>snapshot_date=…"]
-        GOLD["<b>gold/</b><br/>fact_job_posting · demand_by_role<br/>snapshot_date=…"]
-    end
-
-    CATALOG["Glue Data Catalog"]
-    ATHENA["Athena<br/>(serverless SQL)"]
-
-    ATS -->|"land_to_bronze.py (boto3+httpx)"| BRONZE
-    BRONZE -->|"Glue PySpark: bronze_to_silver.py"| SILVER
-    SILVER -->|"Glue PySpark: silver_to_gold.py"| GOLD
-    GOLD -->|"Glue Crawler"| CATALOG
-    CATALOG --> ATHENA
-
-    SFN(["Step Functions<br/>runs the 3 steps in order"])
-    SFN -. start job .-> SILVER
-    SFN -. start job .-> GOLD
-    SFN -. start + poll .-> CATALOG
+flowchart TD
+    EVENT[EventBridge daily schedule - enabled] --> SFN[Step Functions execution + DynamoDB lock]
+    MANUAL[Manual execution] --> SFN
+    SFN --> INGEST[Glue Python Shell ingestion]
+    ATS[Greenhouse / Lever / Ashby / Arbeitnow] --> INGEST
+    INGEST --> BRONZE[S3 Bronze per run and board]
+    INGEST --> MANIFEST[Committed run manifest and board coverage]
+    BRONZE --> SILVER[Glue Spark: validate run + reconcile lifecycle + DQ]
+    MANIFEST --> SILVER
+    PREVIOUS[Prior immutable Silver run] --> SILVER
+    SILVER --> STATE[New Silver run + state pointer]
+    STATE --> GOLD[Glue Spark: active and fresh Gold marts]
+    GOLD --> CRAWLER[Start and verify this crawler run]
+    CRAWLER --> COMPLETE[Completion marker and lock release]
+    GOLD --> CATALOG[Glue Data Catalog]
+    CATALOG --> ATHENA[Athena]
+    COMPLETE --> HEALTH[Read-only freshness check]
 ```
 
-**Orchestration:** the Step Functions state machine runs `bronze_to_silver` → `silver_to_gold`
-(both via the `glue:startJobRun.sync` integration, which blocks until the job finishes) → starts
-the Gold crawler and polls `GetCrawler` until it returns `READY`. Everything in the diagram is
-defined in `infra/*.tf`.
+The execution's run ID and UTC start date are passed to every stage. Ingestion emits one
+canonical shape from four APIs, with actual fetch timestamps. Failed boards and incomplete
+pagination are separate from a successful empty board. A manifest commits only after all
+successful board objects are stored and the configured success threshold is met.
 
-## Services & IaC
+Silver validates the manifest and its exact objects, never scans the historical Bronze root,
+and rejects ingestion over 24 hours old. Identity includes source, board and source posting ID;
+the content hash still deduplicates cross-source in Gold. Lifecycle compares current observations
+with the last committed Silver run: preserve first-seen, refresh last-seen only when observed,
+close jobs absent from complete boards, preserve uncertain boards, expire unobserved jobs after
+7 days, and reactivate returning jobs without resetting their history.
 
-| Layer          | AWS service / resource                                   | Defined in                  |
-| -------------- | -------------------------------------------------------- | --------------------------- |
-| Storage        | S3 — lake (bronze/silver/gold), athena-results, scripts  | `infra/s3.tf`               |
-| Transform      | Glue jobs (PySpark, 2× G.1X, on-demand)                  | `infra/glue.tf`             |
-| Catalog        | Glue Data Catalog database + Crawler                     | `infra/glue.tf`             |
-| Query          | Athena workgroup (`jobmarket-aws`, 10 GB/query cap)      | `infra/athena.tf`           |
-| Orchestration  | Step Functions (Standard) state machine                  | `infra/stepfunctions.tf`    |
-| Security       | IAM roles for Glue + Step Functions (least-privilege)    | `infra/iam.tf`              |
-| Cost guardrail | AWS Budgets ($10/mo, 80% alert) + S3 lifecycle rules     | `infra/budget.tf`, `s3.tf`  |
+Gold includes active postings observed within 26 hours of ingestion completion. The three marts
+are `fact_job_posting`, `demand_by_role`, and `role_opportunity`; role matching and the Athena
+daily-partition layout are retained. Each same-day rerun overwrites the exact partition, even
+when empty. Publication across marts is not transactional, so consumers must honor the matching
+Silver/pipeline completion markers and the wall-clock freshness check.
 
-## How each AWS piece maps to SkillRadar (local)
+One DynamoDB lock serializes all writers; per-job concurrency limits are an additional guard.
+Normal failure releases only the owning execution's lock. Aborted/timed-out executions require
+confirmation that Glue and crawler activity stopped before a conditional unlock. There is no
+automatic lock TTL that might allow overlapping writers.
 
-| AWS service        | Role here                          | SkillRadar / .NET equivalent     |
-| ------------------ | ---------------------------------- | -------------------------------- |
-| S3 (zones)         | Bronze/Silver/Gold storage         | local `data/` Parquet + DuckDB   |
-| Glue (PySpark)     | Distributed Silver/Gold transform  | dbt models / Python services     |
-| Glue Data Catalog  | Table metadata over S3             | DuckDB / MotherDuck schema       |
-| Glue Crawler       | Auto-discovers Gold schema         | (dbt knows the schema directly)  |
-| Athena             | Serverless SQL over the lake       | DuckDB queries / dbt marts       |
-| Step Functions     | Orchestration / DAG                | Prefect flow / Hangfire          |
-| Terraform          | Infrastructure as Code             | (new — the headline P2 skill)    |
+S3 expires Bronze/manifests after 30 days, quality audits after 90 days, and Athena results/Glue
+temp after 7 days. Silver, Gold and state are retained independently, so raw-data expiration
+does not destroy lifecycle history. The first new run bootstraps from real current observations;
+legacy July Silver timestamps cannot establish historical first/last-seen dates.
 
-The domain logic is deliberately a 1:1 port so the two projects are genuinely comparable:
+## Infrastructure map
 
-| Logic                        | SkillRadar (Python/dbt)                         | This repo (PySpark)                          |
-| ---------------------------- | ----------------------------------------------- | -------------------------------------------- |
-| Surrogate key `job_id`       | `dedup.make_job_id` = SHA-256(source\|id)       | `sha2(concat_ws('\|', source, source_job_id))` |
-| Cross-source `dedup_hash`    | `dedup.compute_dedup_hash` (upper SHA-256)      | `upper(sha2(concat_ws('\|', norm×3)))`         |
-| Normalize key                | `text.normalize_for_key`                        | `norm()` in `bronze_to_silver.py`            |
-| Role classification          | `roles.DEFAULT_ROLES` / `seed_roles.csv`        | `DEFAULT_ROLES` in `silver_to_gold.py`       |
-| `fact_job_posting`           | dbt `fact_job_posting.sql`                       | dedupe-by-hash in `silver_to_gold.py`        |
+| Component | Terraform |
+| --- | --- |
+| Lake, scripts, results, retention | `infra/s3.tf` |
+| Ingestion, source catalog, role, execution lock | `infra/ingestion.tf` |
+| Spark jobs, catalog, crawler | `infra/glue.tf` |
+| Shared contract and Spark scripts | `infra/scripts_upload.tf` |
+| Orchestration and completion marker | `infra/stepfunctions.tf` |
+| Permissions | `infra/iam.tf`, `infra/ingestion.tf`, `infra/schedule.tf` |
+| Opt-in schedule | `infra/schedule.tf` |
+| Query and budget controls | `infra/athena.tf`, `infra/budget.tf` |
 
-## Data model (Gold)
-
-**`fact_job_posting`** — one row per active posting, deduped cross-source by `dedup_hash`
-(keep one representative). Grain = `job_id`. Measure = `posting_count = 1`.
-Columns: `job_id, dedup_hash, company_key, posted_date_key, first_seen_date_key, source,
-board_token, company, title, title_lower, location, is_remote, apply_url, posted_at,
-first_seen_at, last_seen_at, posting_count` + partition `snapshot_date`.
-
-**`demand_by_role`** — per target role, count of DISTINCT deduped postings whose title matches
-the role's patterns. Columns: `role, job_count` + partition `snapshot_date`.
-
-## Snapshot model (and an MVP simplification)
-
-Each pipeline run produces one `snapshot_date` partition. Unlike the SkillRadar warehouse (which
-keeps `first_seen_at` / `is_active` history per posting across runs), this MVP treats every run as
-a fresh full snapshot of whatever Bronze currently holds: `first_seen_at = last_seen_at = run time`
-and `is_active = true`. Re-running on another day writes a new `snapshot_date` partition, so
-`demand_by_role` trends over time without ever mutating prior days. Adding true SCD history is a
-natural P2.5 extension.
-
-## Cost
-
-Designed to run on the Free Tier for cents (region `ap-southeast-1`):
-
-- **Glue** is the only real cost: 2× G.1X, 30-min timeout, **on-demand** (no schedule). One run
-  over this dataset is a few cents.
-- **Athena** = $5/TB scanned; Parquet + `snapshot_date` partitions keep queries < 1¢ and the
-  workgroup caps each query at 10 GB.
-- **Step Functions** (Standard) is effectively free at this scale.
-- **S3 lifecycle** expires raw `bronze/` after 30 days and Athena results after 7 days.
-- **AWS Budget** ($10/mo, alert at 80%) is the backstop. No Redshift, no MWAA, no schedule.
-
-## Teardown
-
-It's all IaC — `terraform destroy` from `infra/` removes everything in minutes. The three S3
-buckets use `force_destroy = true` so they delete even with objects in them. Recreate any time
-with `terraform apply`.
-
-## Screenshots
-
-Athena query results for the portfolio live in [`screenshots/`](screenshots/). Run
-[`sql/athena_analysis.sql`](../sql/athena_analysis.sql) in the `jobmarket-aws` workgroup and
-capture the leaderboard (query 1), the remote split (query 2), and the source breakdown (query 4).
+The event schedule remains disabled by default. The existing dashboard is outside this work.

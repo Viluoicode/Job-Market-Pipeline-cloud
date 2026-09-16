@@ -78,6 +78,7 @@ data "aws_iam_policy_document" "sfn_policy" {
     sid     = "RunGlueJobs"
     actions = ["glue:StartJobRun", "glue:GetJobRun", "glue:GetJobRuns", "glue:BatchStopJobRun"]
     resources = [
+      aws_glue_job.ingestion.arn,
       aws_glue_job.bronze_to_silver.arn,
       aws_glue_job.silver_to_gold.arn,
     ]
@@ -86,6 +87,16 @@ data "aws_iam_policy_document" "sfn_policy" {
     sid       = "RunGlueCrawler"
     actions   = ["glue:StartCrawler", "glue:GetCrawler"]
     resources = [aws_glue_crawler.gold.arn]
+  }
+  statement {
+    sid       = "SerializePipeline"
+    actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
+    resources = [aws_dynamodb_table.pipeline_lock.arn]
+  }
+  statement {
+    sid       = "PublishCompletion"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.lake.arn}/state/pipeline/latest.json"]
   }
 }
 

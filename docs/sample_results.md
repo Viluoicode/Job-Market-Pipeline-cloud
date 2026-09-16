@@ -1,5 +1,70 @@
 # Sample results — Athena over the Gold marts
 
+## Scheduled run — 2026-09-16 01:00 UTC+7
+
+After the automatic pipeline succeeded, Athena returned **7,583 postings across 309 companies**,
+including **2,499 remote postings (33.0%)**. Ingestion fetched **7,575 records** from 36 boards;
+Silver contains **7,731 rows** because it also retains lifecycle history. Gold can retain recent
+observations from incomplete boards, so it is not limited to this run's raw observations.
+
+The UTC snapshot date is **2026-09-15**. This scheduled run overwrote that daily Gold partition;
+the manual acceptance figures below are preserved as a historical capture, not a separate
+Athena partition or another day of market change. Arbeitnow still has a two-page cap.
+
+| Rank | Role | Postings | Remote | Top employer (postings) |
+| --- | --- | --- | --- | --- |
+| 1 | Machine Learning Engineer | 174 | 57.5% | OpenAI (37) |
+| 2 | DevOps Engineer | 109 | 22.0% | Palantir (22) |
+| 3 | Data Scientist | 99 | 48.5% | OpenAI (17) |
+| 4 | Full Stack Engineer | 98 | 33.7% | OpenAI (17) |
+| 5 | Backend Engineer | 98 | 48.0% | GitLab (41) |
+| 6 | Data Engineer | 56 | 48.2% | OpenAI (9) |
+| 7 | Mobile Engineer | 35 | 37.1% | Robinhood (12) |
+| 8 | Frontend Engineer | 12 | 41.7% | Reddit (3) |
+
+These are title-based role groups within the configured source sample; one posting can match
+multiple groups. Remote percentages reflect source metadata. Use the health check before
+current-market queries. Full SQL and query IDs appear in
+[scheduled-run-20260916.json](evidence/scheduled-run-20260916.json).
+
+## Manual acceptance — 2026-09-15 (historical capture)
+
+Verified through Athena after the full pipeline succeeded and `check_freshness.py` exited 0.
+**7,578 raw observations → 7,612 Silver lifecycle rows → 7,510 active/fresh,
+content-unique Gold postings**. There are **270 companies**, with
+**2,496 remote postings (33.2%)**.
+Silver includes 34 postings retained from the previous observation because their board could
+not confirm absence; their original `last_seen_at` stays unchanged. They remain eligible only
+within the 26-hour freshness window.
+All 36 configured boards succeeded; Arbeitnow is capped at two pages and marked incomplete.
+These figures describe the configured source sample. Roles use title matching, and a posting
+can match more than one role family.
+
+| Rank | Role | Postings | Remote | Top employer (postings) |
+| --- | --- | --- | --- | --- |
+| 1 | Machine Learning Engineer | 176 | 57.4% | OpenAI (37) |
+| 2 | DevOps Engineer | 109 | 22.0% | Palantir (22) |
+| 3 | Data Scientist | 100 | 49.0% | OpenAI (18) |
+| 4 | Full Stack Engineer | 97 | 34.0% | OpenAI (17) |
+| 5 | Backend Engineer | 96 | 49.0% | GitLab (41) |
+| 6 | Data Engineer | 57 | 49.1% | OpenAI (9) |
+| 7 | Mobile Engineer | 35 | 37.1% | Robinhood (12) |
+| 8 | Frontend Engineer | 12 | 41.7% | Reddit (3) |
+
+Use this table to prioritize roles and employers, then query `fact_job_posting` for current
+application links. SQL is in [athena_analysis.sql](../sql/athena_analysis.sql), and execution/query
+IDs are in [deployment evidence](evidence/deployment-20260915.json). This is a verified daily
+snapshot, not a live guarantee that every application link remains open indefinitely.
+
+## Historical method and results
+
+> **Historical results, not current market freshness.** On 2026-09-14 the latest deployed Gold
+> snapshot was still 2026-07-28 and scheduled execution was disabled. The old transform combined
+> accumulated Bronze and marked all rows active, so 9,206 is not a verified count of currently
+> open jobs. The new ingestion/lifecycle method changes that measurement; see
+> [operations.md](operations.md). Do not interpret the migration count change as a market trend.
+
+
 Real output from a full end-to-end run on AWS (`ap-southeast-1`), snapshot **2026-06-30**.
 Pipeline: `land_to_bronze.py` → S3 `bronze/` → Glue `bronze_to_silver` → Glue `silver_to_gold`
 → Glue Crawler → Athena. 6,900 raw postings landed; **6,809** after cross-source dedup.

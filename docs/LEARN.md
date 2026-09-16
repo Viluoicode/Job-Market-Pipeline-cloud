@@ -1,5 +1,34 @@
 # Học từ ZERO — Job Market AWS Pipeline
 
+> **Cập nhật 16/09/2026:** đã xác minh lượt tự chạy đầu tiên, từ **01:00:16 đến 01:07:29**.
+> EventBridge trên AWS tự kích hoạt; không cần máy cá nhân bật hoặc mở Codex.
+> 36/36 board thành công; Athena có **7.583 tin active/đủ mới thuộc 309 công ty**.
+> Cả ba job Glue, 7/7 quy tắc DQ và crawler đều đạt; kiểm tra độ mới đạt khi ghi nhận bằng chứng.
+> `snapshot_date=2026-09-15` là đúng vì pipeline dùng ngày UTC, tương ứng 01:00 ngày 16/09 ở Việt Nam.
+> Đọc [operations.md](operations.md) và [bằng chứng lượt tự chạy](evidence/scheduled-run-20260916.json).
+> Các số liệu tháng 7 bên dưới là lịch sử, không được dùng để suy ra tin còn mở hôm nay.
+
+## Luồng hiện tại trên AWS
+
+1. Step Functions chốt `run_id` và ngày UTC, lấy khóa DynamoDB để tránh chạy chồng.
+2. Glue Python Shell tự lấy dữ liệu ATS. Mỗi board có trạng thái riêng; lỗi API khác với board rỗng.
+3. Ghi Bronze theo run/board rồi mới ghi manifest. Mặc định cần ít nhất 80% board thành công.
+4. Silver chỉ đọc file của manifest đó và chặn ingestion cũ quá 24 giờ. Mỗi tin có `fetched_at` thật.
+5. Lifecycle giữ `first_seen_at`, chỉ cập nhật `last_seen_at` khi thấy tin; đóng tin vắng mặt từ board
+   lấy đầy đủ. Board lỗi hoặc bị giới hạn phân trang không làm đóng tin ngay; quá 7 ngày thì hết hạn.
+6. Gold chỉ đếm tin active và được quan sát trong 26 giờ tính đến lúc ingestion hoàn tất.
+7. Crawler phải thành công đúng lượt này rồi mới ghi completion marker. Lệnh
+   `python scripts/check_freshness.py --bucket <lake>` kiểm tra độ mới theo đồng hồ hiện tại.
+
+`job_id` mới dùng `source|board_token|source_job_id` để tránh trùng ID giữa các board.
+Silver lưu lịch sử theo run; Bronze hết hạn sau 30 ngày không xóa lịch sử này. Lượt đầu sau nâng cấp
+chỉ khởi tạo lịch sử từ quan sát mới vì timestamp của Silver cũ là thời gian transform.
+Lịch đã bật sau khi kiểm tra end-to-end. Chưa phát triển thêm dashboard. Athena/SQL hiện đã
+trả lời được nhu cầu theo nghề, tỷ lệ remote, công ty tuyển nhiều và danh sách link ứng tuyển.
+
+## Tài liệu nền tảng của phiên bản ban đầu (tham khảo lịch sử)
+
+
 > Tài liệu này dành cho **người chưa biết gì** về project. Đọc từ trên xuống, bạn sẽ hiểu:
 > project làm gì, các khái niệm nền tảng, dữ liệu chảy thế nào, dùng những dịch vụ AWS nào,
 > và cách tự chạy lại. Không cần biết trước về AWS, Spark hay data engineering.
@@ -501,5 +530,3 @@ Không. Cả 4 đều là API công khai.
   *(Verify 2026-07-27: rule live, trạng thái DISABLED, target trỏ đúng state machine.)*
 - ⏳ Còn lại (tuỳ chọn): Redshift Serverless + Spectrum · Lambda bọc ingestion để pipeline hoàn
   toàn serverless.
-</content>
-</invoke>
