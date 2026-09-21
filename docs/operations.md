@@ -32,9 +32,15 @@ by the previous evening's manual verification; the immutable Silver runs retain 
 Gold can include recent prior observations whose board could not confirm absence, until they
 exceed the freshness window. Its row count need not be below the current raw fetch count.
 
+<<<<<<< ours
 The deployed pipeline now has evidence of an automatic daily run. Failure/staleness alerting
 and a separately scheduled health check are still follow-up work; this evidence is not an
 ongoing monitoring service. The acceptance record below documents the earlier manual runs.
+=======
+The deployed pipeline now has evidence of an automatic daily run. Failure/staleness alerting and an independent scheduled health check were deployed on
+2026-09-17; see [monitoring.md](monitoring.md) for the current notification status and runbook.
+The evidence file itself remains a point-in-time capture. The acceptance record below documents the earlier manual runs.
+>>>>>>> theirs
 
 ## Deployment acceptance — 2026-09-15 (historical record)
 

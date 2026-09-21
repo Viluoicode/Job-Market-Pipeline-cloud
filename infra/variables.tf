@@ -141,3 +141,20 @@ variable "freshness_hours" {
     error_message = "freshness_hours must be a positive integer."
   }
 }
+
+
+variable "enable_monitor_email" {
+  description = "Subscribe the existing alert_email to pipeline SNS alerts; recipient must confirm by email."
+  type        = bool
+  default     = false
+}
+
+variable "monitor_min_success_ratio" {
+  description = "Alert when successful-board coverage falls below this fraction; default alerts on any failed board."
+  type        = number
+  default     = 1.0
+  validation {
+    condition     = var.monitor_min_success_ratio > 0 && var.monitor_min_success_ratio <= 1
+    error_message = "Monitoring coverage threshold must be in (0, 1]."
+  }
+}

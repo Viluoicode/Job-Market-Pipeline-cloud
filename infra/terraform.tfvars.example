@@ -17,3 +17,7 @@ schedule_expression = "cron(0 18 * * ? *)" # 01:00 UTC+7 the following day
 ingestion_min_success_ratio = 0.8
 freshness_hours             = 26
 stale_after_days           = 7
+
+# Monitoring runs on AWS every 15 minutes. Email requires SNS confirmation.
+enable_monitor_email = false
+monitor_min_success_ratio = 1.0

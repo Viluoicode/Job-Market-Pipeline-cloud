@@ -55,3 +55,21 @@ output "ingestion_job" {
 output "pipeline_lock_table" {
   value = aws_dynamodb_table.pipeline_lock.name
 }
+
+
+output "health_monitor_function" {
+  value = aws_lambda_function.health_monitor.function_name
+}
+
+output "pipeline_alert_topic" {
+  value = aws_sns_topic.pipeline_alerts.arn
+}
+
+output "pipeline_alarm_names" {
+  value = concat([for alarm in aws_cloudwatch_metric_alarm.pipeline_failure : alarm.alarm_name],
+  [aws_cloudwatch_metric_alarm.pipeline_health.alarm_name, aws_cloudwatch_metric_alarm.source_coverage.alarm_name])
+}
+
+output "inspect_today_query_id" {
+  value = aws_athena_named_query.inspect_today_jobs.id
+}

@@ -1,0 +1,213 @@
+{
+  "verified_at": "2026-09-17T03:01:50.501401+00:00",
+  "lambda_result": {
+    "healthy": true,
+    "reason": "fresh",
+    "run_id": "c86395ef-92e5-b0c2-a7af-48a3a3121c0a_404d2b08-be23-2011-32ea-a9eb2e781a11",
+    "snapshot_date": "2026-09-16",
+    "ingested_at": "2026-09-16T18:01:30.382943+00:00",
+    "published_at": "2026-09-16T18:08:14.361Z",
+    "ingestion_age_hours": 8.92,
+    "rows_ingested": 7597,
+    "successful_boards": 36,
+    "failed_boards": 0,
+    "incomplete_boards": 1,
+    "source_success_ratio": 1.0
+  },
+  "manual_invocation_status": 200,
+  "queries": {
+    "inspect_today": {
+      "id": "86cbf5c0-7aec-4350-8278-30eb7932519a",
+      "state": "SUCCEEDED",
+      "returned_rows": 100,
+      "sample_rows": [
+        {
+          "source": "arbeitnow",
+          "board_token": "arbeitnow",
+          "company": "8Thlightrebuild",
+          "title": "Lead Software Engineer (Hybrid)",
+          "location": "London",
+          "is_remote": "false",
+          "apply_url": "https://www.arbeitnow.co.uk/jobs/companies/8thlightrebuild/lead-software-engineer-hybrid-london-125806",
+          "observed_at_utc": "2026-09-16 18:01:30.213",
+          "observed_at_vietnam": "2026-09-17 01:01:30",
+          "first_seen_at": "2026-09-16 18:01:30.213",
+          "snapshot_date": "2026-09-16"
+        },
+        {
+          "source": "arbeitnow",
+          "board_token": "arbeitnow",
+          "company": "8Thlightrebuild",
+          "title": "Principal Software Engineer (Hybrid)",
+          "location": "London",
+          "is_remote": "false",
+          "apply_url": "https://www.arbeitnow.co.uk/jobs/companies/8thlightrebuild/principal-software-engineer-hybrid-london-122650",
+          "observed_at_utc": "2026-09-16 18:01:30.213",
+          "observed_at_vietnam": "2026-09-17 01:01:30",
+          "first_seen_at": "2026-09-16 18:01:30.213",
+          "snapshot_date": "2026-09-16"
+        },
+        {
+          "source": "arbeitnow",
+          "board_token": "arbeitnow",
+          "company": "ABC Industries",
+          "title": "Software Engineer",
+          "location": "London",
+          "is_remote": "false",
+          "apply_url": "https://www.arbeitnow.co.uk/jobs/companies/abc-industries/software-engineer-london-497966",
+          "observed_at_utc": "2026-09-16 18:01:30.213",
+          "observed_at_vietnam": "2026-09-17 01:01:30",
+          "first_seen_at": "2026-09-16 18:01:30.213",
+          "snapshot_date": "2026-09-16"
+        }
+      ]
+    },
+    "counts": {
+      "id": "3bf0ebd6-9a5b-4289-8e59-6c016b9e78a8",
+      "state": "SUCCEEDED",
+      "returned_rows": 1,
+      "sample_rows": [
+        {
+          "gold_postings": "7850",
+          "observed_today_vietnam": "7477",
+          "companies": "441"
+        }
+      ]
+    }
+  },
+  "monitor_schedule": {
+    "Name": "jobmarket-aws-health-monitor-schedule",
+    "State": "ENABLED",
+    "ScheduleExpression": "rate(15 minutes)"
+  },
+  "monitor_targets": [
+    {
+      "Id": "terraform-20260917025455032800000001",
+      "Arn": "arn:aws:lambda:ap-southeast-1:290488660407:function:jobmarket-aws-health-monitor"
+    }
+  ],
+  "email_subscriptions": [
+    {
+      "protocol": "email",
+      "confirmed": false
+    }
+  ],
+  "sns_topic_arn": "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts",
+  "alarms": [
+    {
+      "AlarmName": "jobmarket-aws-pipeline-aborted",
+      "StateValue": "OK",
+      "MetricName": "ExecutionsAborted",
+      "Threshold": 1.0,
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "DatapointsToAlarm": null,
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": [
+        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+      ]
+    },
+    {
+      "AlarmName": "jobmarket-aws-pipeline-failed",
+      "StateValue": "OK",
+      "MetricName": "ExecutionsFailed",
+      "Threshold": 1.0,
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "DatapointsToAlarm": null,
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": [
+        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+      ]
+    },
+    {
+      "AlarmName": "jobmarket-aws-pipeline-timed-out",
+      "StateValue": "OK",
+      "MetricName": "ExecutionsTimedOut",
+      "Threshold": 1.0,
+      "Period": 300,
+      "EvaluationPeriods": 1,
+      "DatapointsToAlarm": null,
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": [
+        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+      ]
+    },
+    {
+      "AlarmName": "jobmarket-aws-pipeline-unhealthy",
+      "StateValue": "OK",
+      "MetricName": "Healthy",
+      "Threshold": 1.0,
+      "Period": 900,
+      "EvaluationPeriods": 2,
+      "DatapointsToAlarm": 2,
+      "TreatMissingData": "breaching",
+      "AlarmActions": [
+        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+      ]
+    },
+    {
+      "AlarmName": "jobmarket-aws-source-coverage-low",
+      "StateValue": "OK",
+      "MetricName": "SourceSuccessRatio",
+      "Threshold": 1.0,
+      "Period": 900,
+      "EvaluationPeriods": 2,
+      "DatapointsToAlarm": 2,
+      "TreatMissingData": "notBreaching",
+      "AlarmActions": [
+        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+      ]
+    }
+  ],
+  "saved_query": {
+    "Name": "Jobs observed today (Vietnam)",
+    "NamedQueryId": "9f592987-4f80-4cd7-9170-c33d4ab3b221",
+    "Database": "jobmarket_aws_gold",
+    "WorkGroup": "jobmarket-aws"
+  },
+  "metrics": {
+    "Healthy": [
+      {
+        "Timestamp": "2026-09-17 09:46:00+07:00",
+        "SampleCount": 2.0,
+        "Minimum": 1.0,
+        "Maximum": 1.0,
+        "Unit": "Count"
+      }
+    ],
+    "SourceSuccessRatio": [
+      {
+        "Timestamp": "2026-09-17 09:46:00+07:00",
+        "SampleCount": 2.0,
+        "Minimum": 1.0,
+        "Maximum": 1.0,
+        "Unit": "None"
+      }
+    ]
+  },
+  "scheduled_monitor_invocations": [
+    {
+      "timestamp_ms": 1789613722527,
+      "message": {
+        "trigger": "aws.events",
+        "request_id": "23bccd99-cb38-42f4-85a4-0b4d90fc7016"
+      }
+    }
+  ],
+  "delivery_test": {
+    "test_alarm": "jobmarket-aws-monitoring-TEST",
+    "started_at": "2026-09-17T02:59:28.492838+00:00",
+    "action_succeeded": true,
+    "temporary_alarm_deleted": true,
+    "note": "Verified CloudWatch -> SNS action. This does not independently prove inbox receipt."
+  },
+  "validation": {
+    "pytest_passed": 56,
+    "pytest_seconds": 189.88,
+    "terraform_validate": "PASS",
+    "terraform_fmt": "PASS",
+    "terraform_final_plan": "No changes",
+    "git_commit": "Not performed; requires user acceptance"
+  }
+}
