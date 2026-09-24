@@ -6,6 +6,7 @@ Project documentation covers purpose, system design, operations, and recorded re
 | --- | --- | --- |
 | [Proposal](proposal.md) | Canonical problem statement, target users, value proposition, scope, and adoption case | The business problem or intended users change |
 | [Architecture](architecture.md) | Current system boundaries, data flow, contracts, lifecycle, and design decisions | The deployed design or a core invariant changes |
+| [Architecture drawing guide](architecture-drawing-guide.md) | Learner drawing steps, service/arrow mapping and final diagram review checklist | Diagram preparation or acceptance changes |
 | [Operations](operations.md) | Deploy, run, verify, pause, recover, and safely retire the pipeline | An operator procedure or Terraform workflow changes |
 | [Monitoring](monitoring.md) | Health model, alarms, notification setup, and AWS data inspection | Monitoring behavior or an alarm changes |
 | [Sample results](sample_results.md) | Reproducible, point-in-time Athena results and interpretation limits | A new result set is intentionally recorded |

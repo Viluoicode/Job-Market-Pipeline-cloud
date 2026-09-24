@@ -34,7 +34,9 @@ flowchart TD
     SCHEDULE[EventBridge daily rule] --> SFN[Step Functions Standard]
     MANUAL[Manual StartExecution] --> SFN
     SFN --> LOCK[DynamoDB conditional lock]
-    LOCK --> INGEST[Glue Python Shell ingestion]
+    SFN -. start and wait .-> INGEST[Glue Python Shell ingestion]
+    SFN -. start and wait .-> SILVER
+    SFN -. start and wait .-> GOLD
     ATS[Greenhouse / Lever / Ashby / Arbeitnow] --> INGEST
     INGEST --> BRONZE[S3 Bronze objects]
     INGEST --> MANIFEST[Committed ingestion manifest]
@@ -42,21 +44,32 @@ flowchart TD
     MANIFEST --> SILVER
     PREVIOUS[Previous immutable Silver run] --> SILVER
     SILVER --> SILVER_RUN[New immutable Silver run]
-    SILVER_RUN --> SILVER_STATE[Silver latest pointer]
-    SILVER_STATE --> GOLD[Glue Spark: active/fresh Gold marts]
-    GOLD --> CRAWLER[Glue Crawler]
+    SILVER --> SILVER_STATE[Silver latest pointer]
+    SILVER_RUN --> GOLD[Glue Spark: active/fresh Gold marts]
+    SILVER_STATE -. select committed run .-> GOLD
+    GOLD --> GOLD_DATA[S3 Gold marts]
+    SFN -. start and verify .-> CRAWLER[Glue Crawler]
+    GOLD_DATA --> CRAWLER
     CRAWLER --> CATALOG[Glue Data Catalog]
     CATALOG --> ATHENA[Athena workgroup]
-    CRAWLER --> COMPLETE[Pipeline completion marker]
-    COMPLETE --> RELEASE[Conditional lock release]
+    GOLD_DATA --> ATHENA
+    ATHENA --> RESULTS[S3 Athena results]
+    SFN -. after verified crawl .-> COMPLETE[Pipeline completion marker]
 
     MONITOR_SCHEDULE[EventBridge every 15 minutes] --> MONITOR[Lambda health monitor]
     MANIFEST --> MONITOR
     SILVER_STATE --> MONITOR
     COMPLETE --> MONITOR
     MONITOR --> METRICS[CloudWatch metrics and alarms]
+    SFN -. execution metrics .-> METRICS
     METRICS --> SNS[SNS email notification]
 ```
+
+Solid arrows primarily show data/metadata movement; dashed arrows label control or metric paths.
+Step Functions conditionally releases its DynamoDB lock after publication or caught failure;
+abort/timeout recovery requires the runbook. This explanatory Mermaid is not the final
+learner-authored AWS-icon diagram. Use the [drawing guide](architecture-drawing-guide.md)
+to prepare that deliverable and check each connection against Terraform.
 
 The state machine is the only authorized production write path. A run identifier and the UTC date
 of the execution are fixed at workflow start and passed to every stage.

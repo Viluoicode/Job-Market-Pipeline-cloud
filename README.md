@@ -27,8 +27,13 @@ flowchart LR
     INGEST --> BRONZE[S3 Bronze\nRun manifest]
     BRONZE --> SILVER[Glue Spark\nLifecycle + data quality]
     SILVER --> GOLD[Glue Spark\nGold marts]
-    GOLD --> CATALOG[Glue Crawler\nand Data Catalog]
+    GOLD --> GOLD_DATA[S3 Gold marts]
+    SFN -. start and verify .-> CRAWLER[Glue Crawler]
+    GOLD_DATA --> CRAWLER
+    CRAWLER --> CATALOG[Glue Data Catalog]
     CATALOG --> ATHENA[Athena]
+    GOLD_DATA --> ATHENA
+    ATHENA --> RESULTS[S3 query results]
     MONITOR_EVENT[EventBridge\nEvery 15 minutes] --> MONITOR[Lambda\nHealth monitor]
     MONITOR --> CW[CloudWatch\nMetrics and alarms]
     CW --> SNS[SNS email]
