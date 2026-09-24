@@ -174,6 +174,12 @@ source sample and must not be presented as the whole labor market.
 Security controls are defined mainly in `infra/s3.tf`, `infra/iam.tf`, `infra/ingestion.tf`,
 `infra/schedule.tf`, `infra/monitoring.tf`, and `infra/athena.tf`.
 
+The transform jobs and crawler share a Glue role with object write/delete access across all
+three project buckets. Separating crawler read access from transformation write permissions is
+a remaining least-privilege improvement. The 21 September 2026 review also identified lake
+versioning outside Terraform management and absent TLS-only bucket policies. These findings
+describe improvement work, not security controls already implemented.
+
 ## Storage lifecycle
 
 | Data | Default retention | Reason |
@@ -196,8 +202,9 @@ Security controls are defined mainly in `infra/s3.tf`, `infra/iam.tf`, `infra/in
 - **DynamoDB lock instead of a time-based lock:** a TTL could expire while an external Glue task
   still writes, allowing corruption through concurrent runs.
 - **Daily schedule:** it balances freshness with Glue cost for this portfolio-scale source set.
-- **Athena instead of Redshift or MWAA:** current scale does not justify warehouse or Airflow
-  infrastructure and operating cost.
+- **Athena instead of Redshift:** current SQL volume does not justify a dedicated warehouse.
+- **Step Functions instead of MWAA:** this AWS batch workflow does not currently justify
+  operating an Airflow environment.
 - **Separate health monitor:** successful orchestration alone does not prove fresh, internally
   consistent, or sufficiently covered data.
 

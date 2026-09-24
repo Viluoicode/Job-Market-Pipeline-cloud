@@ -54,17 +54,11 @@ reliability model, and design decisions.
 Gold is queryable through the `jobmarket_aws_gold` Glue Catalog database in the
 `jobmarket-aws` Athena workgroup.
 
-## Deployment status
+## Deployment
 
-The stack is deployed in AWS account `290488660407`, region `ap-southeast-1`.
-
-- The ingestion schedule is enabled at `18:00 UTC`, or `01:00 UTC+7` the next day.
-- Scheduled AWS executions have been verified without a local machine or Codex running.
-- The independent health monitor runs every 15 minutes.
-- Historical acceptance records live under [`docs/evidence/`](docs/evidence/README.md).
-
-Deployment status is time-sensitive. Follow the [operations runbook](docs/operations.md) to
-verify the latest execution and data before using a current-market result.
+The reference deployment runs in `ap-southeast-1`, with daily ingestion at 01:00 UTC+7 and an
+independent health check every 15 minutes. [Acceptance records](docs/evidence/README.md) document
+verified runs. Use the [operations runbook](docs/operations.md) to check current health.
 
 ## Repository layout
 
@@ -76,7 +70,7 @@ infra/       Terraform for storage, compute, orchestration, IAM, monitoring, and
 scripts/     Read-only operational checks
 sql/         Athena inspection and analysis queries
 tests/       Ingestion, lifecycle, transformation, freshness, and monitoring tests
-docs/        Architecture, runbooks, learning material, results, and evidence
+docs/        Proposal, architecture, runbooks, results, and evidence
 dashboard/   Existing experimental Streamlit serving client; outside the current scope
 ```
 
@@ -109,27 +103,15 @@ omitted boards would not represent a complete market observation.
 Do not start individual Glue stages as a production shortcut. Deploy a reviewed Terraform plan,
 then start or allow EventBridge to start the Step Functions state machine.
 
-```powershell
-terraform -chdir=infra init
-terraform -chdir=infra fmt -check -recursive
-terraform -chdir=infra validate
-terraform -chdir=infra plan -out=pipeline.tfplan
-terraform -chdir=infra apply pipeline.tfplan
-```
-
 Exact deployment, verification, recovery, pause, and cleanup procedures are in
 [Operations](docs/operations.md). Monitoring behavior and direct AWS inspection are in
 [Monitoring](docs/monitoring.md).
 
 ## Cost and safety controls
 
-- New deployments keep the daily schedule disabled until explicitly enabled.
-- Glue worker counts and timeouts bound the main compute cost.
-- Athena rejects queries that scan more than 10 GiB in the project workgroup.
-- S3 expires Bronze/manifests after 30 days, quality results after 90 days, and temporary/results
-  data after 7 days; Silver, Gold, and state remain available for lifecycle history.
-- AWS Budget support and alert email configuration are defined in Terraform.
-- S3 buckets are private and encrypted, and runtime roles are scoped by responsibility.
+New deployments default to a disabled schedule. Glue limits, S3 retention, an Athena scan cutoff,
+and AWS Budget alerts help control usage; a budget alert does not stop spending. See
+[architecture](docs/architecture.md) for retention and security boundaries.
 
 Never use `terraform destroy` to recover a failed execution. The lake buckets allow Terraform to
 empty them during destruction, so a destroy can remove retained history. Use the recovery and
@@ -138,10 +120,10 @@ retirement procedures in the operations runbook.
 ## Documentation
 
 - [Documentation map](docs/README.md)
+- [Project proposal and problem statement](docs/proposal.md)
 - [System architecture](docs/architecture.md)
 - [Operations runbook](docs/operations.md)
 - [Monitoring and AWS inspection](docs/monitoring.md)
-- [Learning guide](docs/LEARN.md)
 - [Verified sample results](docs/sample_results.md)
 
 ## License

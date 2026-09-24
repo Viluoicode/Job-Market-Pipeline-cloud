@@ -21,6 +21,7 @@ venv/
 # ---- Local scratch / ingestion dry-run output ----
 bronze_local/
 out/
+.local-docs/
 *.local.json
 
 # ---- OS / editor ----

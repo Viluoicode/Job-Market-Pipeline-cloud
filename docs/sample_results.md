@@ -103,7 +103,7 @@ The mart the dashboard renders: per role, demand rank + remote share + top hirin
 | 8 | Frontend Engineer | 17 | 41.2% | Airbnb (3) |
 
 Read as a decision: ML/AI roles dominate demand; Data Engineer is the most remote-friendly of the
-top roles (53.8%). Rendered in [`dashboard.html`](dashboard.html).
+top roles (53.8%). These figures describe the historical snapshot above.
 
 ## Demand by role (`demand_by_role`)
 
