@@ -4,11 +4,11 @@
 
 -- Athena analysis over the Gold marts (database: jobmarket_aws_gold).
 -- Console: pick the `jobmarket-aws` workgroup, then run these one at a time.
--- Parquet + snapshot_date partitions keep every query well under 1 cent (the workgroup also
--- caps each query at 10 GB scanned). Screenshot the results for your portfolio.
+-- Use partition predicates and inspect bytes scanned; small sample results do not guarantee future cost.
+-- The workgroup caps each query at 10 GiB scanned.
 
 -- 0) THE DECISION QUERY â€” the role_opportunity mart in one shot: demand rank, remote share, and
---    the top hiring company per role. This is what the dashboard renders.
+--    the top hiring company per role. The dashboard derives filtered charts from the fact table.
 SELECT demand_rank, role, job_count, remote_pct, top_company, top_company_count
 FROM jobmarket_aws_gold.role_opportunity
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.role_opportunity)
@@ -20,7 +20,7 @@ FROM jobmarket_aws_gold.demand_by_role
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.demand_by_role)
 ORDER BY job_count DESC;
 
--- 2) Remote vs on-site split across all active postings (latest snapshot).
+-- 2) Remote-indicated vs not-marked-remote split across all active postings (latest snapshot).
 SELECT
     is_remote,
     count(*)                                              AS postings,

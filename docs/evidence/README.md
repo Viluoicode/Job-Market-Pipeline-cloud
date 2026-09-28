@@ -5,6 +5,8 @@ observed at a specific time; they are not a live status page.
 
 | File | Purpose |
 | --- | --- |
+| `workshop-validation-20260928.json` | Tests, Terraform validation, UI checks and redacted SNS/alarm status |
+| `workshop-20260928.json` | Current scheduled pipeline and verified dashboard query |
 | `deployment-20260915.json` | Manual end-to-end acceptance after the ingestion and lifecycle upgrade |
 | `scheduled-run-20260916.json` | First verified EventBridge-triggered daily execution |
 | `monitoring-20260917.json` | Monitoring, metrics, alarms, tests, and notification-path acceptance |

@@ -11,8 +11,8 @@ traceable lifecycle records, and publishes fresh analytical marts. It is designe
 writer, low operational overhead, and serverless query access.
 
 The source catalog is not the entire job market. Role families are title-based classifications,
-and remote status reflects source metadata. The system currently serves data through Athena; the
-experimental Streamlit client is outside the active delivery scope.
+and remote status reflects source metadata. The system serves data through Athena and a local Streamlit workshop dashboard. The dashboard
+checks publication metadata and the writer lock before and after reading the published partition.
 
 ## System context
 
@@ -22,6 +22,7 @@ flowchart LR
     APIS[Public job APIs] --> PIPELINE[AWS data pipeline]
     PIPELINE --> LAKE[Amazon S3 data lake]
     LAKE --> ATHENA
+    ATHENA --> DASHBOARD[Streamlit workshop dashboard]
     PIPELINE --> OBS[CloudWatch and SNS]
     OPERATOR[Operator] --> PIPELINE
     OBS --> OPERATOR
@@ -68,8 +69,8 @@ flowchart TD
 Solid arrows primarily show data/metadata movement; dashed arrows label control or metric paths.
 Step Functions conditionally releases its DynamoDB lock after publication or caught failure;
 abort/timeout recovery requires the runbook. This explanatory Mermaid is not the final
-learner-authored AWS-icon diagram. Use the [drawing guide](architecture-drawing-guide.md)
-to prepare that deliverable and check each connection against Terraform.
+learner-authored AWS-icon diagram. The learner should draw the final diagram with official AWS icons, distinguish control from data
+flows, and verify each service, permission and connection against Terraform. See [workshop.md](workshop.md).
 
 The state machine is the only authorized production write path. A run identifier and the UTC date
 of the execution are fixed at workflow start and passed to every stage.
@@ -247,3 +248,17 @@ describe improvement work, not security controls already implemented.
 
 See [sample_results.md](sample_results.md) for point-in-time analytical results and their
 interpretation limits.
+
+## Dashboard serving boundary
+
+`dashboard/data_access.py` checks the DynamoDB writer lock, matching Silver/completion/manifest
+identities, snapshot dates and ingestion age (maximum 26 hours). It reads only the published fact
+partition, then checks again. Cached results include S3 metadata fingerprints in their key.
+An in-progress, stale, failed or changed publication blocks display; no fallback to MAX(date).
+This is a conservative reader safeguard, not an atomic transaction over Gold. A run may begin
+after a page is rendered; the page is a point-in-time view and idle pages do not auto-refresh.
+
+The UI runs on the presenter's laptop and reads AWS; it is not publicly hosted. Stopping the UI
+does not stop AWS ingestion. The dashboard has no ingestion controls and does not write the lake;
+Athena stores query results in its workgroup result bucket. All charts derive from the same fact
+rows so filters stay consistent. Role patterns are checked against Gold in regression tests.

@@ -1,23 +1,20 @@
-# Documentation map
+# Documentation map / Bản đồ tài liệu
 
-Project documentation covers purpose, system design, operations, and recorded results.
+README giới thiệu repo; tài liệu dưới đây giải thích cách học, triển khai và kiểm chứng.
+The root README is the entry point; each document below has a distinct responsibility.
 
-| Document | Purpose | Update when |
-| --- | --- | --- |
-| [Proposal](proposal.md) | Canonical problem statement, target users, value proposition, scope, and adoption case | The business problem or intended users change |
-| [Architecture](architecture.md) | Current system boundaries, data flow, contracts, lifecycle, and design decisions | The deployed design or a core invariant changes |
-| [Architecture drawing guide](architecture-drawing-guide.md) | Learner drawing steps, service/arrow mapping and final diagram review checklist | Diagram preparation or acceptance changes |
-| [Operations](operations.md) | Deploy, run, verify, pause, recover, and safely retire the pipeline | An operator procedure or Terraform workflow changes |
-| [Monitoring](monitoring.md) | Health model, alarms, notification setup, and AWS data inspection | Monitoring behavior or an alarm changes |
-| [Sample results](sample_results.md) | Reproducible, point-in-time Athena results and interpretation limits | A new result set is intentionally recorded |
-| [Evidence](evidence/README.md) | Machine-readable deployment and acceptance records | A deployment milestone is formally accepted |
+| File | Nhiệm vụ / Responsibility |
+| --- | --- |
+| [proposal.md](proposal.md) | Bài toán, giá trị thực hành, phạm vi và tiêu chí hoàn thành / Problem and scope |
+| [architecture.md](architecture.md) | Luồng dữ liệu, hợp đồng, lifecycle và quyết định thiết kế / Design and invariants |
+| [workshop.md](workshop.md) | Thực hành VI/EN, chạy dashboard, demo và bàn giao / Bilingual lab guide |
+| [data-dictionary.md](data-dictionary.md) | Ý nghĩa bảng, trường và cách đọc chỉ số / Data and metric semantics |
+| [operations.md](operations.md) | Deploy, kiểm tra mỗi ngày, recovery, pause, cleanup / Operator runbook |
+| [monitoring.md](monitoring.md) | Health model, alarm và kiểm tra SNS / Monitoring reference |
+| [cost-and-security.md](cost-and-security.md) | Dự toán, kiểm soát chi phí, quyền và giới hạn / Cost and security |
+| [sample_results.md](sample_results.md) | Kết quả đã đo, có ngày và query ID / Dated measured results |
+| [evidence/](evidence/README.md) | Bằng chứng máy đọc được; không sửa lịch sử / Immutable acceptance records |
 
-## Documentation rules
-
-- `README.md` is the repository entry point, not an operations log.
-- Current design belongs in `architecture.md`; commands and incident steps belong in
-  `operations.md`.
-- Time-sensitive numbers must include an observation date and link to evidence.
-- Evidence files are append-only records. Correct the describing document instead of rewriting a
-  past observation.
-- Never publish credentials, personal email addresses, Terraform state, or unredacted secrets.
+Không giữ roadmap sản phẩm, thử nghiệm nguồn Việt Nam hay ghi chú cá nhân trong tài liệu dự án.
+Evidence là quan sát tại một thời điểm, không phải trạng thái hiện tại. Không commit credentials,
+email cá nhân, Terraform state, dữ liệu tải thử hay môi trường Python.

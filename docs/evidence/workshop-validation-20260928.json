@@ -1,0 +1,68 @@
+{
+  "checked_at": "2026-09-28T07:54:40.097494+00:00",
+  "pipeline_tests": {
+    "passed": 67,
+    "runtime": "Python 3.11, Java 17, PySpark 3.5.1"
+  },
+  "terraform": {
+    "fmt_check": "passed",
+    "validate": "passed",
+    "apply_performed": false
+  },
+  "dashboard": {
+    "app_test": "passed: full snapshot, text search, empty result, role and remote filters",
+    "visual_browser_check": "not performed: no connected browser available",
+    "runtime": "Streamlit 1.64.0, pandas 2.3.3, Plotly 6.9.0",
+    "hosting": "localhost only",
+    "live_aws_app_test": {
+      "result": "passed",
+      "unique_postings": 8157,
+      "companies": 467,
+      "locations": 1069,
+      "marked_remote_pct": 30.4
+    }
+  },
+  "monitoring": {
+    "subscriptions": [
+      {
+        "protocol": "email",
+        "confirmed": true
+      }
+    ],
+    "alarms": [
+      {
+        "AlarmName": "jobmarket-aws-pipeline-aborted",
+        "StateValue": "OK",
+        "ActionsEnabled": true
+      },
+      {
+        "AlarmName": "jobmarket-aws-pipeline-failed",
+        "StateValue": "OK",
+        "ActionsEnabled": true
+      },
+      {
+        "AlarmName": "jobmarket-aws-pipeline-timed-out",
+        "StateValue": "OK",
+        "ActionsEnabled": true
+      },
+      {
+        "AlarmName": "jobmarket-aws-pipeline-unhealthy",
+        "StateValue": "OK",
+        "ActionsEnabled": true
+      },
+      {
+        "AlarmName": "jobmarket-aws-source-coverage-low",
+        "StateValue": "OK",
+        "ActionsEnabled": true
+      }
+    ]
+  },
+  "documentation": {
+    "local_links": "checked, no missing targets",
+    "conflict_markers": "removed"
+  },
+  "git": {
+    "committed": false,
+    "pushed": false
+  }
+}

@@ -1,5 +1,4 @@
-# Serving layer (Streamlit dashboard reading Athena). Install:  pip install -r dashboard/requirements.txt
-streamlit>=1.36
-awswrangler>=3.9      # one-liner Athena -> pandas (pulls boto3 + pyarrow)
-pandas>=2.2
-plotly>=5.22
+streamlit==1.64.0
+boto3>=1.34,<2
+pandas>=2.2,<3
+plotly>=5.22,<7

@@ -1,0 +1,95 @@
+{
+  "checked_at": "2026-09-28T07:42:44.529447+00:00",
+  "publication": {
+    "run_id": "71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
+    "snapshot_date": "2026-09-27",
+    "ingested_at": "2026-09-27T18:01:41.545767+00:00",
+    "published_at": "2026-09-27T18:08:56.676Z",
+    "ingestion_age_hours": 13.68,
+    "rows_ingested": 7838,
+    "successful_boards": 36,
+    "failed_boards": 0,
+    "incomplete_boards": 1
+  },
+  "athena": {
+    "query_id": "55428c11-d652-44b2-ae6b-2fba64082f58",
+    "bytes_scanned": 981745
+  },
+  "gold": {
+    "postings": 8157,
+    "companies": 467,
+    "remote": 2481
+  },
+  "schedule": {
+    "Name": "jobmarket-aws-pipeline-schedule",
+    "State": "ENABLED",
+    "ScheduleExpression": "cron(0 18 * * ? *)"
+  },
+  "recent_executions": [
+    {
+      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "name": "71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
+      "status": "SUCCEEDED",
+      "startDate": "2026-09-28 01:00:16.277000+07:00",
+      "stopDate": "2026-09-28 01:08:56.937000+07:00",
+      "redriveCount": 0
+    },
+    {
+      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:c068bf88-69cf-35e2-9740-3f092825e473_f6b0db03-8779-f462-5bf0-db4f9cda4bdb",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "name": "c068bf88-69cf-35e2-9740-3f092825e473_f6b0db03-8779-f462-5bf0-db4f9cda4bdb",
+      "status": "SUCCEEDED",
+      "startDate": "2026-09-27 01:00:16.191000+07:00",
+      "stopDate": "2026-09-27 01:09:11.578000+07:00",
+      "redriveCount": 0
+    },
+    {
+      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:3a8c3535-ca9f-cb29-91c5-8abb75352ec0_e6cf3043-69c2-9eee-3900-c8e5ea673328",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "name": "3a8c3535-ca9f-cb29-91c5-8abb75352ec0_e6cf3043-69c2-9eee-3900-c8e5ea673328",
+      "status": "SUCCEEDED",
+      "startDate": "2026-09-26 01:00:16.203000+07:00",
+      "stopDate": "2026-09-26 01:08:18.447000+07:00",
+      "redriveCount": 0
+    }
+  ],
+  "sample": [
+    {
+      "job_id": "6311b0d6c9bee444ab07f3bb561d9ef961774d447601073c7e378228c21d37a7",
+      "company": "0G",
+      "title": "Enterprise Business Development",
+      "location": "Remote",
+      "source": "arbeitnow",
+      "is_remote": true,
+      "apply_url": "https://www.arbeitnow.ch/jobs/companies/0g/remote-enterprise-business-development-486270",
+      "first_seen_at": "2026-09-27 18:01:41.329",
+      "last_seen_at": "2026-09-27 18:01:41.329",
+      "snapshot_date": "2026-09-27"
+    },
+    {
+      "job_id": "a18399ca47e5b90c701c18c1e5517dcbe40ff4491ec06172cab0efcd1d0b6735",
+      "company": "0G",
+      "title": "Product Engineer",
+      "location": "Remote",
+      "source": "arbeitnow",
+      "is_remote": true,
+      "apply_url": "https://www.arbeitnow.ch/jobs/companies/0g/remote-product-engineer-85511",
+      "first_seen_at": "2026-09-27 18:01:41.329",
+      "last_seen_at": "2026-09-27 18:01:41.329",
+      "snapshot_date": "2026-09-27"
+    },
+    {
+      "job_id": "55a69b68f739deea31deb56d131b65b0fc8ab8b6a20d24deacc81ff6159da315",
+      "company": "1Password",
+      "title": "Account Executive Enterprise UKI",
+      "location": "London, UK",
+      "source": "arbeitnow",
+      "is_remote": false,
+      "apply_url": "https://www.arbeitnow.co.uk/jobs/companies/1password/account-executive-enterprise-uki-london-264208",
+      "first_seen_at": "2026-09-26 18:01:39.287",
+      "last_seen_at": "2026-09-26 18:01:39.287",
+      "snapshot_date": "2026-09-27"
+    }
+  ]
+}
