@@ -50,7 +50,15 @@ The workflow publishes completion only after ingestion, Silver checks, Gold and 
 succeed. The dashboard checks the writer lock and matching publication metadata before and after
 reading the published partition. Full data/control paths, security boundaries and trade-offs are
 in [architecture.md](docs/architecture.md). This Mermaid is an explanatory map; the learner's final
-AWS-icon diagram is a separate workshop submission artifact.
+AWS-icon diagram is still to be added here. Save the editable source as
+`docs/diagrams/architecture.drawio` and its export as `docs/diagrams/architecture.png`.
+Place `![AWS architecture](docs/diagrams/architecture.png)` immediately below this Architecture
+heading once the file exists; replace or collapse the Mermaid overview to avoid duplicate diagrams.
+See the [diagram handoff instructions](docs/workshop.md#architecture-artifact-placement).
+
+Security hardening was deployed on **30 September 2026**: separate stage roles, a restricted
+dashboard reader, HTTPS-only bucket access and deliberate cleanup controls. See the
+[permission matrix](docs/security-review.md) and [live acceptance](docs/evidence/security-acceptance-20260930.json).
 
 ## What is included
 
@@ -81,24 +89,56 @@ The 01:00 local run belongs to the previous UTC date. Use the
 
 ## Run the dashboard
 
-For an existing deployed stack, configure an AWS profile, then run from the repository root:
+There are three separate actions:
+
+| Action | Where it runs | When you need it |
+| --- | --- | --- |
+| Deploy with Terraform | Creates/updates AWS resources | First setup or reviewed infrastructure/code changes |
+| Run the pipeline | AWS: EventBridge ? Step Functions ? Glue | Automatically at 01:00 UTC+7; optional manual full execution |
+| Open the dashboard | Your computer; reads published AWS data | Whenever you want to inspect results |
+
+**VI:** Stack hi?n t?i ?? deploy v? b?t l?ch. ?? xem d? li?u, ch? m? dashboard; kh?ng c?n
+`terraform apply` hay ch?y l?i Glue. T?t m?y kh?ng d?ng l?ch AWS. Dashboard kh?ng crawl d? li?u.
+
+Run PowerShell from the repository root (the folder containing this README, `infra/` and `dashboard/`).
+Use an authenticated AWS profile authorized to assume the configured dashboard reader.
+
+One-time local setup (reuse an existing suitable environment if you have one):
 
 ```powershell
-python -m pip install -r dashboard/requirements.txt
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r dashboard/requirements.txt
+```
+
+Each new terminal session:
+
+```powershell
+# Optional: set AWS_PROFILE to your existing configured profile; otherwise use default.
+# $env:AWS_PROFILE = 'your-profile'
+aws sts get-caller-identity
 $env:AWS_REGION = 'ap-southeast-1'
 $env:LAKE_BUCKET = terraform -chdir=infra output -raw lake_bucket
 $env:PIPELINE_LOCK_TABLE = terraform -chdir=infra output -raw pipeline_lock_table
 $env:ATHENA_DATABASE = terraform -chdir=infra output -raw gold_database
 $env:ATHENA_WORKGROUP = terraform -chdir=infra output -raw athena_workgroup
-python -m streamlit run dashboard/app.py --server.address 127.0.0.1
+$env:AWS_DASHBOARD_ROLE_ARN = terraform -chdir=infra output -raw dashboard_reader_role_arn
+.\.venv\Scripts\python.exe -m streamlit run dashboard/app.py --server.address 127.0.0.1
 ```
 
-Open **http://localhost:8501**. This is a local presentation client reading AWS, not a public hosted
-service. Closing it does not stop ingestion. The page rejects stale/in-progress publication;
-refresh it to recheck health. An idle page does not refresh automatically.
+Open **http://localhost:8501** and press **Refresh data**. Keep the terminal running; `Ctrl+C`
+stops only the dashboard. Repeat the environment-variable block after opening a new terminal.
+No Java/Spark installation is needed just to view the dashboard.
 
-For a new stack, follow [the lab guide](docs/workshop.md) for prerequisites, Terraform deployment,
-first-run verification, monitoring, demo and cleanup. Real credentials and tfvars must stay private.
+These `terraform output` commands read the existing deployment state; they do not deploy anything.
+A fresh clone does not include private state or AWS credentials. If outputs are unavailable, obtain
+these six settings from the existing deployment's operator; do not create another stack just to view it.
+If reusing a different venv, substitute its Python executable consistently in both commands.
+
+The reader role must trust your authenticated principal. Missing credentials or an AssumeRole denial
+must be resolved through that profile/trust configuration, not by removing the reader restriction.
+The page blocks stale or in-progress publication. An idle page does not refresh automatically.
+See [daily checks and troubleshooting](docs/operations.md) and [the lab guide](docs/workshop.md)
+for new deployments, manual runs, monitoring and cleanup.
 
 ## Develop and test
 
@@ -130,8 +170,8 @@ docs/         Lab, architecture, runbooks, costs and evidence
 
 This is a bounded workshop, not a hardened multi-user production service. Arbeitnow pagination is
 capped; title-based roles overlap; missing remote metadata does not mean onsite. Gold publication
-is not an atomic transaction across marts. The shared Glue role and other hardening gaps are
-recorded explicitly in the architecture. See [metric definitions](docs/data-dictionary.md).
+is not an atomic transaction across marts. Stage-specific roles, an assumed dashboard reader, HTTPS bucket policies and versioning are
+managed by Terraform. See the [security review](docs/security-review.md) for remaining boundaries. See [metric definitions](docs/data-dictionary.md).
 
 Daily Glue and supporting AWS services incur charges even when credits offset them. Budget alerts
 do not cap spending. Read [cost assumptions and security](docs/cost-and-security.md) and
@@ -140,9 +180,12 @@ Destroying this stack can delete retained data.
 
 ## Workshop handoff
 
-Code, lab instructions and AWS query evidence are available. The final learner-verified AWS-icon
-diagram, dashboard screenshots/video, saved Pricing Calculator estimate and bilingual report
-website still need to be supplied before claiming full program submission. See
+The implemented pipeline, security changes and local dashboard have passed live acceptance.
+The scheduled run on **1 October 2026 at 01:00 UTC+7** also succeeded; see
+[the dated handoff check](docs/evidence/handoff-check-20261001.json). Four dashboard PNGs exist in
+`docs/screenshots/`; review their framing/dates before embedding them. The learner-verified AWS-icon
+diagram, demo video, saved Pricing Calculator estimate and bilingual report website still need
+to be supplied before claiming full program submission. See
 [the handoff checklist](docs/workshop.md#8-bàn-giao-workshop--submission-boundary).
 
 ## License

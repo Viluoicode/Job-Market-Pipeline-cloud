@@ -23,7 +23,7 @@ locals {
 
 resource "aws_glue_job" "bronze_to_silver" {
   name              = "${var.project}-bronze-to-silver"
-  role_arn          = aws_iam_role.glue.arn
+  role_arn          = aws_iam_role.silver.arn
   glue_version      = var.glue_version
   worker_type       = var.glue_worker_type
   number_of_workers = var.glue_number_of_workers
@@ -39,13 +39,13 @@ resource "aws_glue_job" "bronze_to_silver" {
     python_version  = "3"
   }
 
-  default_arguments = local.glue_common_args
-  depends_on        = [aws_s3_object.bronze_to_silver]
+  default_arguments = merge(local.glue_common_args, { "--TempDir" = "s3://${aws_s3_bucket.scripts.bucket}/tmp/silver/" })
+  depends_on        = [aws_s3_object.bronze_to_silver, aws_iam_role_policy.silver]
 }
 
 resource "aws_glue_job" "silver_to_gold" {
   name              = "${var.project}-silver-to-gold"
-  role_arn          = aws_iam_role.glue.arn
+  role_arn          = aws_iam_role.gold.arn
   glue_version      = var.glue_version
   worker_type       = var.glue_worker_type
   number_of_workers = var.glue_number_of_workers
@@ -61,15 +61,16 @@ resource "aws_glue_job" "silver_to_gold" {
     python_version  = "3"
   }
 
-  default_arguments = local.glue_common_args
-  depends_on        = [aws_s3_object.silver_to_gold]
+  default_arguments = merge(local.glue_common_args, { "--TempDir" = "s3://${aws_s3_bucket.scripts.bucket}/tmp/gold/" })
+  depends_on        = [aws_s3_object.silver_to_gold, aws_iam_role_policy.gold]
 }
 
 # Crawls s3://<lake>/gold/ and registers fact_job_posting + demand_by_role (one table per
 # top-level folder via TableLevelConfiguration = 3: <bucket>/gold/<table>/snapshot_date=.../).
 resource "aws_glue_crawler" "gold" {
+  depends_on    = [aws_iam_role_policy.crawler]
   name          = "${var.project}-gold-crawler"
-  role          = aws_iam_role.glue.arn
+  role          = aws_iam_role.crawler.arn
   database_name = aws_glue_catalog_database.gold.name
 
   s3_target {

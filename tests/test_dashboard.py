@@ -86,3 +86,30 @@ def test_only_web_links_are_clickable():
     assert safe_link("https://example.com/job/1") == "https://example.com/job/1"
     assert safe_link("javascript:alert(1)") is None
     assert safe_link("file:///secret") is None
+
+
+def test_dashboard_requires_reader_role():
+    with pytest.raises(ValueError, match="AWS_DASHBOARD_ROLE_ARN"):
+        data.create_reader_session("ap-southeast-1", "")
+
+
+def test_dashboard_uses_only_assumed_credentials(monkeypatch):
+    import boto3
+    base = Mock()
+    base.client.return_value.assume_role.return_value = {"Credentials": {
+        "AccessKeyId": "test-key", "SecretAccessKey": "test-secret", "SessionToken": "test-token"}}
+    factory = Mock()
+    monkeypatch.setattr(boto3, "Session", factory)
+    arn = "arn:aws:iam::123456789012:role/dashboard-reader"
+    assert data.create_reader_session("ap-southeast-1", arn, base_session=base) == factory.return_value
+    base.client.return_value.assume_role.assert_called_once_with(
+        RoleArn=arn, RoleSessionName="jobmarket-dashboard", DurationSeconds=3600)
+    factory.assert_called_once_with(region_name="ap-southeast-1", aws_access_key_id="test-key",
+                                   aws_secret_access_key="test-secret", aws_session_token="test-token")
+
+
+def test_dashboard_assume_failure_has_no_fallback():
+    base = Mock()
+    base.client.return_value.assume_role.side_effect = RuntimeError("AccessDenied")
+    with pytest.raises(RuntimeError, match="AccessDenied"):
+        data.create_reader_session("ap-southeast-1", "arn:aws:iam::123456789012:role/reader", base_session=base)

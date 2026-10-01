@@ -73,3 +73,11 @@ output "pipeline_alarm_names" {
 output "inspect_today_query_id" {
   value = aws_athena_named_query.inspect_today_jobs.id
 }
+
+output "dashboard_reader_role_arn" {
+  description = "Set AWS_DASHBOARD_ROLE_ARN to this value for the local dashboard."
+  value       = try(aws_iam_role.dashboard_reader[0].arn, "")
+}
+output "stage_role_arns" {
+  value = { silver = aws_iam_role.silver.arn, gold = aws_iam_role.gold.arn, crawler = aws_iam_role.crawler.arn }
+}

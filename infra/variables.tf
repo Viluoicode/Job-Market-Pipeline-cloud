@@ -158,3 +158,18 @@ variable "monitor_min_success_ratio" {
     error_message = "Monitoring coverage threshold must be in (0, 1]."
   }
 }
+
+variable "allow_bucket_force_destroy" {
+  description = "Explicitly opt into deleting nonempty project buckets during lab cleanup."
+  type        = bool
+  default     = false
+}
+variable "dashboard_reader_principal_arns" {
+  description = "Explicit IAM user/role ARNs allowed to assume the restricted dashboard reader. Empty disables creation."
+  type        = list(string)
+  default     = []
+  validation {
+    condition     = alltrue([for arn in var.dashboard_reader_principal_arns : can(regex("^arn:aws:iam::[0-9]{12}:(user|role)/.+$", arn))])
+    error_message = "Use explicit IAM user or role ARNs, not account root or wildcards."
+  }
+}

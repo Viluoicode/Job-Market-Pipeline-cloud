@@ -21,3 +21,7 @@ stale_after_days           = 7
 # Monitoring runs on AWS every 15 minutes. Email requires SNS confirmation.
 enable_monitor_email = false
 monitor_min_success_ratio = 1.0
+
+# Explicit IAM user/role that will launch the local dashboard (no account-root trust).
+# dashboard_reader_principal_arns = ["arn:aws:iam::123456789012:user/workshop-operator"]
+allow_bucket_force_destroy = false

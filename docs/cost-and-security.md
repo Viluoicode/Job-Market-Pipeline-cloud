@@ -44,11 +44,15 @@ remaining credit. A schedule can initiate billable work even while the laptop is
 
 ## Security / Bảo mật
 
-Private S3 buckets and encryption at rest protect stored data. Runtime IAM roles avoid keys in
-code. Keep Terraform state, tfvars, credentials and downloaded payloads out of Git. The existing
-shared Glue/crawler role is broader than ideal least privilege; TLS-only bucket policy and full
-versioning management also remain hardening gaps documented in [architecture](architecture.md).
-Do not describe this workshop as production-certified or fully hardened.
+Private buckets, SSE-S3 and HTTPS enforcement protect storage and transport. Separate stage roles
+scope output writes and keep runtime code read-only. The local dashboard assumes an explicit
+short-lived reader role; no admin fallback is used for data access. Terraform manages bucket
+ownership and lake/scripts versioning. Never commit state, credentials or real tfvars.
+
+The operator still has administrative access for deployment. IAM simulations and live acceptance
+are scoped checks, not production certification. See [security-review](security-review.md).
+Versioning preserves old versions: current-object expiration alone does not bound all storage.
+No new noncurrent-version expiry has been enabled; account for retained versions in cost estimates.
 
 For a dedicated dashboard reader, scope permissions to the specific resources:
 
@@ -61,7 +65,7 @@ For a dedicated dashboard reader, scope permissions to the specific resources:
 | DynamoDB | Consistent GetItem on the one pipeline-lock table |
 
 Additional KMS permissions are needed if the deployment is changed to customer-managed keys.
-These are permission requirements, not a new IAM policy already deployed by the dashboard.
+These capabilities are now defined in the deployed dashboard-reader policy.
 Use a short-lived profile for a supervised local demo. Public hosting, user authentication and
 multi-user authorization are outside this workshop release.
 
@@ -70,3 +74,5 @@ multi-user authorization are outside this workshop release.
 
 **EN:** Do not expose the local demo server or share credentials. Respect source terms and data
 limitations. Keep a separate reviewer-visible record of remaining security trade-offs.
+
+Detailed live IAM/S3 audit, current and target permission matrices: [Security review, 30 September 2026](security-review.md). The report distinguishes deployed controls from pre-hardening findings.

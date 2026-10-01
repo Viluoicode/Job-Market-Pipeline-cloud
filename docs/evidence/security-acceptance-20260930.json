@@ -1,0 +1,231 @@
+{
+  "failed_attempt": {
+    "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:security-rerun-20260930-093208",
+    "startDate": "2026-09-30 16:32:07.653000+07:00",
+    "ResponseMetadata": {
+      "RequestId": "f1de2200-31e5-4cdc-ba0e-5b762d99b512",
+      "HTTPStatusCode": 200,
+      "HTTPHeaders": {
+        "x-amzn-requestid": "f1de2200-31e5-4cdc-ba0e-5b762d99b512",
+        "date": "Wed, 30 Sep 2026 09:32:07 GMT",
+        "content-type": "application/x-amz-json-1.0",
+        "content-length": "154",
+        "connection": "keep-alive"
+      },
+      "RetryAttempts": 0
+    },
+    "status": "FAILED",
+    "cause": "Gold overwrite required exact mart-root _$folder$ objects; corrected GoldDirectoryMarkers policy and reran the full pipeline."
+  },
+  "checked_at": "2026-09-30 09:46:06.725811+00:00",
+  "scope": "Security hardening live acceptance; manual same-day executions, not evidence of a new scheduled trigger",
+  "executions": [
+    {
+      "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:security-verify-20260930-090432",
+      "status": "SUCCEEDED",
+      "start": "2026-09-30 16:04:32.385000+07:00",
+      "stop": "2026-09-30 16:11:30.564000+07:00",
+      "jobs": [
+        {
+          "Id": "jr_18e2fe21d024cea10ac48786d270aab5feae9cb2c5cfe9d4f4f1a56cd25d4837",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:04:32.683000+07:00",
+          "CompletedOn": "2026-09-30 16:05:32.910000+07:00",
+          "job": "jobmarket-aws-ingestion",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-ingestion-role",
+          "access_denied_log_matches": 0
+        },
+        {
+          "Id": "jr_20e43b2a8532c4d0f19ac994fdd56bf518962b8ca88c5f14dbebf190592cb213",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:06:27.074000+07:00",
+          "CompletedOn": "2026-09-30 16:08:30.721000+07:00",
+          "job": "jobmarket-aws-bronze-to-silver",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-silver-role",
+          "quality": {
+            "result_id": "dqresult-516bf221a3e4c1849795b68ddb2353d45ce99226",
+            "score": 1.0,
+            "rules_passed": 7
+          },
+          "access_denied_log_matches": 0
+        },
+        {
+          "Id": "jr_f0cfe4e077a1aad5e632fe23aebaf47ac4d28028f5333d4d28ed05cc35e4ac6d",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:08:31.474000+07:00",
+          "CompletedOn": "2026-09-30 16:10:13.741000+07:00",
+          "job": "jobmarket-aws-silver-to-gold",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-gold-role",
+          "access_denied_log_matches": 0
+        }
+      ]
+    },
+    {
+      "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:security-marker-fix-20260930-093919",
+      "status": "SUCCEEDED",
+      "start": "2026-09-30 16:39:18.547000+07:00",
+      "stop": "2026-09-30 16:45:31.668000+07:00",
+      "jobs": [
+        {
+          "Id": "jr_c8c5fcc54d2033dd10c709565388fd587799825df9fddd123c2b4a9b8f36f464",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:39:18.805000+07:00",
+          "CompletedOn": "2026-09-30 16:40:09.840000+07:00",
+          "job": "jobmarket-aws-ingestion",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-ingestion-role",
+          "access_denied_log_matches": 0
+        },
+        {
+          "Id": "jr_d5fe56ba59e93a31bd517b3f8ccca4ad143a0ab0b00967ee6138e8926a2b8544",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:40:21.153000+07:00",
+          "CompletedOn": "2026-09-30 16:42:22.172000+07:00",
+          "job": "jobmarket-aws-bronze-to-silver",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-silver-role",
+          "quality": {
+            "result_id": "dqresult-dcef0a8960739f8d9516fc958cd32163702fd04d",
+            "score": 1.0,
+            "rules_passed": 7
+          },
+          "access_denied_log_matches": 0
+        },
+        {
+          "Id": "jr_2fcc1caeb31de88fe20c4a393930926827b98f88e76670f5ce962b7595b0f30c",
+          "JobRunState": "SUCCEEDED",
+          "StartedOn": "2026-09-30 16:42:28.511000+07:00",
+          "CompletedOn": "2026-09-30 16:44:12.269000+07:00",
+          "job": "jobmarket-aws-silver-to-gold",
+          "role": "arn:aws:iam::290488660407:role/jobmarket-aws-gold-role",
+          "access_denied_log_matches": 0
+        }
+      ]
+    }
+  ],
+  "reader_queries": [
+    {
+      "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:security-verify-20260930-090432",
+      "status": "SUCCEEDED",
+      "metadata": {
+        "run_id": "security-verify-20260930-090432",
+        "snapshot_date": "2026-09-30",
+        "ingested_at": "2026-09-30T09:05:22.468222+00:00",
+        "published_at": "2026-09-30T09:11:30.293Z",
+        "ingestion_age_hours": 0.44,
+        "rows_ingested": 7849,
+        "successful_boards": 36,
+        "failed_boards": 0,
+        "incomplete_boards": 1
+      },
+      "query": {
+        "query_id": "e513d528-ef14-49eb-af3a-b64b456afbe8",
+        "bytes_scanned": 970593
+      },
+      "rows": 8082,
+      "unique_job_ids": 8082
+    },
+    {
+      "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:security-marker-fix-20260930-093919",
+      "metadata": {
+        "run_id": "security-marker-fix-20260930-093919",
+        "snapshot_date": "2026-09-30",
+        "ingested_at": "2026-09-30T09:39:59.407455+00:00",
+        "published_at": "2026-09-30T09:45:31.397Z",
+        "ingestion_age_hours": 0.1,
+        "rows_ingested": 7848,
+        "successful_boards": 36,
+        "failed_boards": 0,
+        "incomplete_boards": 1
+      },
+      "query": {
+        "query_id": "71953b79-c1f7-47d2-a40f-fa9d73c983ba",
+        "bytes_scanned": 994335
+      },
+      "rows": 8132,
+      "unique_job_ids": 8132
+    }
+  ],
+  "crawler": {
+    "role": "jobmarket-aws-crawler-role",
+    "state": "READY",
+    "last_crawl": {
+      "Status": "SUCCEEDED",
+      "StartTime": "2026-09-30 16:44:30+07:00"
+    }
+  },
+  "tests": {
+    "passed": 70
+  },
+  "iam_simulations": {
+    "passed": 52,
+    "evidence": "security-permissions-20260930.json"
+  },
+  "terraform_plan": "No changes (detailed-exitcode 0)",
+  "limitations": [
+    "No atomic transaction across Gold marts",
+    "Noncurrent S3 versions have no new expiry",
+    "Operator admin access unchanged; dashboard is local only"
+  ],
+  "dashboard": {
+    "method": "Streamlit AppTest against live AWS using assumed reader; not visual browser inspection",
+    "overview_metrics": {
+      "Unique postings": "8,132",
+      "Companies (reported)": "524",
+      "Locations (reported)": "1,101",
+      "Marked remote": "30.8%"
+    },
+    "backend_metrics": {
+      "Unique postings": "97",
+      "Companies (reported)": "23",
+      "Locations (reported)": "49",
+      "Marked remote": "41.2%"
+    },
+    "no_app_errors": true,
+    "server_health": "ok",
+    "writer_lock_guard": {
+      "passed": true,
+      "behavior": "Active pipeline lock blocks dashboard metrics"
+    }
+  },
+  "monitoring": {
+    "alarms": [
+      {
+        "name": "jobmarket-aws-pipeline-aborted",
+        "state": "OK"
+      },
+      {
+        "name": "jobmarket-aws-pipeline-failed",
+        "state": "OK"
+      },
+      {
+        "name": "jobmarket-aws-pipeline-timed-out",
+        "state": "OK"
+      },
+      {
+        "name": "jobmarket-aws-pipeline-unhealthy",
+        "state": "OK"
+      },
+      {
+        "name": "jobmarket-aws-source-coverage-low",
+        "state": "OK"
+      }
+    ],
+    "rules": [
+      {
+        "name": "jobmarket-aws-health-monitor-schedule",
+        "schedule": "rate(15 minutes)",
+        "state": "ENABLED"
+      },
+      {
+        "name": "jobmarket-aws-pipeline-schedule",
+        "schedule": "cron(0 18 * * ? *)",
+        "state": "ENABLED"
+      }
+    ]
+  },
+  "access_analyzer_findings": {
+    "jobmarket-aws-silver-role": [],
+    "jobmarket-aws-gold-role": [],
+    "jobmarket-aws-crawler-role": [],
+    "jobmarket-aws-dashboard-reader-role": []
+  }
+}

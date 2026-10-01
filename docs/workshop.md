@@ -53,19 +53,23 @@ Kết quả mong đợi: từng stage thành công, manifest và state pointers 
 
 ## 5. Dashboard đọc AWS / Run the dashboard
 
-From the repository root, with AWS access already configured:
+Follow [Run the dashboard in README](../README.md#run-the-dashboard) for the canonical
+one-time setup and per-terminal commands. Reuse your existing environment or create `.venv`.
+The dashboard does not require Java or a local Spark runtime.
 
-```powershell
-python -m pip install -r dashboard/requirements.txt
-$env:AWS_REGION = 'ap-southeast-1'
-$env:LAKE_BUCKET = terraform -chdir=infra output -raw lake_bucket
-$env:PIPELINE_LOCK_TABLE = terraform -chdir=infra output -raw pipeline_lock_table
-$env:ATHENA_DATABASE = terraform -chdir=infra output -raw gold_database
-$env:ATHENA_WORKGROUP = terraform -chdir=infra output -raw athena_workgroup
-python -m streamlit run dashboard/app.py --server.address 127.0.0.1
-```
+**VI:** M? PowerShell t?i root repo ? x?c th?c AWS ? ??t s?u bi?n m?i tr??ng theo README ?
+ch?y Streamlit ? m? **http://localhost:8501** ? b?m **Refresh data**. Gi? terminal m?;
+`Ctrl+C` ch? d?ng giao di?n, l?ch AWS v?n ch?y. Kh?ng c?n deploy l?i ?? xem d? li?u.
 
-Open **http://localhost:8501**.
+**EN:** The existing stack continues ingestion independently. Starting Streamlit only reads the
+published snapshot; it does not start ingestion. A fresh clone needs the existing stack settings
+and authorized AWS credentials because private Terraform state is not committed.
+
+Before deployment, set `dashboard_reader_principal_arns` in private tfvars to the IAM user/role
+launching the dashboard. That principal needs sts:AssumeRole on the reader. Credentials are
+exchanged for a restricted one-hour session; the app stops if role assumption fails.
+VI: Cấu hình ARN người/role được phép assume reader trong tfvars; không dùng ARN account-root.
+
 
 **VI:** Xem ngày UTC, tuổi ingestion và coverage trước. Lọc nguồn, role, địa điểm hoặc tiêu đề;
 KPI, biểu đồ và bảng cùng thay đổi. Mở link gốc để kiểm tra một tin. Refresh kiểm tra publication
@@ -124,3 +128,67 @@ that report, not this code repository.
 Requirements reviewed 28 September 2026:
 [Workshop requirements](https://hcm-rules.awsfcaj.com/3-project/),
 [Scoring criteria](https://hcm-rules.awsfcaj.com/5-scoring/).
+
+### Architecture artifact placement
+
+1. L?u file s?a ???c ? `docs/diagrams/architecture.drawio`; xu?t `architecture.png` (ho?c SVG)
+   v?o c?ng th? m?c. T?o th? m?c khi c? artifact th?t; kh?ng commit ?nh placeholder.
+2. Trong **README ? Architecture**, ??t ?nh ngay d??i heading, tr??c ?o?n gi?i th?ch lu?ng:
+
+   ```markdown
+   ![AWS architecture](docs/diagrams/architecture.png)
+   ```
+
+   Thay Mermaid b?ng ?nh ho?c ??a Mermaid v?o kh?i thu g?n; gi? ph?n m? t? v? link t?i li?u.
+3. Trong `docs/architecture.md`, th?m ?nh `![AWS architecture](diagrams/architecture.png)`
+   ngay d??i ti?u ?? ch?nh v? link `[Editable diagram](diagrams/architecture.drawio)`.
+4. ??i chi?u b?n v? v?i deployment: AWS region Singapore; API v? local Streamlit ? ngo?i AWS;
+   EventBridge ? Step Functions, DynamoDB lock, ba Glue jobs, S3 lake Bronze/Silver/Gold,
+   crawler ? Catalog ? Athena, bucket scripts v? Athena results; health Lambda ? CloudWatch ? SNS.
+   D?ng n?t kh?c nhau cho orchestration v? data; kh?ng t? th?m VPC/NAT/subnet ch?a tri?n khai.
+5. IAM: th? hi?n role Silver, Gold, Crawler ri?ng v? dashboard assume reader role. ??i chi?u
+   [ma tr?n quy?n](security-review.md), kh?ng d?ng role Glue chung c?a thi?t k? c?.
+
+EN: Commit both editable diagram and export. Embed the export in README's Architecture section,
+and link its source from the detailed architecture document. The diagram must reflect deployed
+resources and the separate runtime roles, not an unimplemented target design.
+
+### Final handoff checklist / Ki?m tra tr??c commit
+
+- [x] Pipeline, daily schedule, lifecycle/DQ, monitoring and reader-role dashboard verified on AWS.
+- [x] Security acceptance and same-day overwrite recovery documented (30 September).
+- [x] Next scheduled execution and live dashboard checked (1 October); see
+  [evidence](evidence/handoff-check-20261001.json). This is a dated observation, not a live guarantee.
+- [x] Four PNG screenshots exist under `docs/screenshots/`.
+- [ ] Add and personally verify the AWS-icon diagram as described above.
+- [ ] Review screenshots at readable size; capture UTC date/freshness, label their snapshot,
+  then embed overview/postings in README and filtered/verification in the lab/report.
+- [ ] Supply demo video/link, saved Pricing Calculator estimate and bilingual report website
+  for the workshop submission. Existing repo checks do not certify the entire program rubric.
+- [ ] Review `git diff --check`, `git diff --stat`, `git status --short`, then stage chosen project
+  files. Inspect `git diff --cached` before committing. Keep tfvars, state, credentials,
+  local environments, logs and downloaded datasets out of Git.
+
+The failed security test remains in historical evidence with its fix; do not erase it to make
+all execution history appear successful. No extra production rerun is needed just for a commit.
+
+## 9. Dashboard screenshots / Ảnh dashboard cần chụp
+
+Use actual AWS data after Refresh; keep the snapshot date visible. Do not edit counts or hide a
+coverage warning. Browser zoom 90–100%, a wide window, no open dropdowns/tooltips over charts.
+Chụp PNG rõ chữ; không cần chụp cả desktop hoặc thanh tab có thông tin riêng tư.
+
+| Suggested filename | What to capture / Nội dung |
+| --- | --- |
+| `dashboard-overview.png` | No filters. Title, UTC date/freshness, coverage, four KPIs and both charts. If one frame is too tall, split overview and charts instead of shrinking text. |
+| `dashboard-postings.png` | Posting table with title, company, location, source, last observation and original link; show 8–12 readable rows. Scroll horizontally if needed for the link. |
+| `dashboard-filtered.png` | Select Data Engineer (or Backend Engineer); keep the selected filter, changed KPIs/chart and part of the results visible. Use the same snapshot as the overview. |
+| `dashboard-verification.png` | Expand Data scope and verification; capture run ID, raw count, Athena query ID and scan size. This image supports the report rather than the README hero. |
+
+Save reviewed images in `docs/screenshots/`. Use overview + postings in README, filtered +
+verification in the lab/report. Include a caption with capture date and UTC snapshot. A screenshot
+is a point-in-time observation, not proof that daily scheduling remains healthy.
+
+**VI:** Bộ ảnh dashboard chưa thay thế bằng chứng AWS. Khi quay demo, bổ sung execution Step
+Functions, manifest/DQ và CloudWatch alarms theo mục 6. Không cố tình làm lỗi pipeline thật chỉ để
+chụp cảnh báo; có thể minh họa trường hợp không có kết quả bằng một từ khóa không khớp.

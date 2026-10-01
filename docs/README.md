@@ -11,6 +11,7 @@ The root README is the entry point; each document below has a distinct responsib
 | [data-dictionary.md](data-dictionary.md) | Ý nghĩa bảng, trường và cách đọc chỉ số / Data and metric semantics |
 | [operations.md](operations.md) | Deploy, kiểm tra mỗi ngày, recovery, pause, cleanup / Operator runbook |
 | [monitoring.md](monitoring.md) | Health model, alarm và kiểm tra SNS / Monitoring reference |
+| [security-review.md](security-review.md) | Kiểm tra IAM/S3 thực tế, ma trận quyền hiện tại và đề xuất / Deployed permissions audit |
 | [cost-and-security.md](cost-and-security.md) | Dự toán, kiểm soát chi phí, quyền và giới hạn / Cost and security |
 | [sample_results.md](sample_results.md) | Kết quả đã đo, có ngày và query ID / Dated measured results |
 | [evidence/](evidence/README.md) | Bằng chứng máy đọc được; không sửa lịch sử / Immutable acceptance records |

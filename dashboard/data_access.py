@@ -9,6 +9,21 @@ class PublicationUnavailable(RuntimeError):
     pass
 
 
+def create_reader_session(region, role_arn, *, base_session=None):
+    """Use only short-lived reader credentials for data access; never fall back to admin."""
+    import boto3
+    if not re.fullmatch(r"arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+", role_arn or ""):
+        raise ValueError("Set AWS_DASHBOARD_ROLE_ARN to the deployed dashboard reader role ARN.")
+    base = base_session or boto3.Session(region_name=region)
+    credentials = base.client("sts").assume_role(
+        RoleArn=role_arn, RoleSessionName="jobmarket-dashboard", DurationSeconds=3600,
+    )["Credentials"]
+    return boto3.Session(
+        region_name=region, aws_access_key_id=credentials["AccessKeyId"],
+        aws_secret_access_key=credentials["SecretAccessKey"], aws_session_token=credentials["SessionToken"],
+    )
+
+
 def validate_publication(completion, silver, manifest, now=None):
     now = now or datetime.now(timezone.utc)
     run = completion.get("run_id")

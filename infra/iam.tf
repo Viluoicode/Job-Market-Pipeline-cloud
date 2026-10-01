@@ -1,5 +1,5 @@
 # ============================================================================================
-# IAM — one role for Glue (jobs + crawler), one for the Step Functions state machine.
+# IAM â€” one role for Glue (jobs + crawler), one for the Step Functions state machine.
 # ============================================================================================
 
 # ---- Glue role -----------------------------------------------------------------------------
@@ -13,50 +13,6 @@ data "aws_iam_policy_document" "glue_assume" {
   }
 }
 
-resource "aws_iam_role" "glue" {
-  name               = "${var.project}-glue-role"
-  assume_role_policy = data.aws_iam_policy_document.glue_assume.json
-}
-
-# Managed policy: Glue catalog access, CloudWatch Logs, networking, etc.
-resource "aws_iam_role_policy_attachment" "glue_service" {
-  role       = aws_iam_role.glue.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
-}
-
-# Our own buckets aren't named "aws-glue-*", so grant S3 access explicitly.
-data "aws_iam_policy_document" "glue_s3" {
-  statement {
-    sid     = "ObjectAccess"
-    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"]
-    resources = [
-      "${aws_s3_bucket.lake.arn}/*",
-      "${aws_s3_bucket.scripts.arn}/*",
-      "${aws_s3_bucket.athena_results.arn}/*",
-    ]
-  }
-  statement {
-    sid     = "ListBuckets"
-    actions = ["s3:ListBucket", "s3:GetBucketLocation"]
-    resources = [
-      aws_s3_bucket.lake.arn,
-      aws_s3_bucket.scripts.arn,
-      aws_s3_bucket.athena_results.arn,
-    ]
-  }
-  statement {
-    sid       = "Metrics"
-    actions   = ["cloudwatch:PutMetricData"]
-    resources = ["*"]
-  }
-}
-
-resource "aws_iam_role_policy" "glue_s3" {
-  name   = "${var.project}-glue-s3"
-  role   = aws_iam_role.glue.id
-  policy = data.aws_iam_policy_document.glue_s3.json
-}
-
 # ---- Step Functions role -------------------------------------------------------------------
 data "aws_iam_policy_document" "sfn_assume" {
   statement {
@@ -64,6 +20,16 @@ data "aws_iam_policy_document" "sfn_assume" {
     principals {
       type        = "Service"
       identifiers = ["states.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+    condition {
+      test     = "ArnEquals"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:states:${var.region}:${data.aws_caller_identity.current.account_id}:stateMachine:${var.project}-pipeline"]
     }
   }
 }
@@ -92,6 +58,11 @@ data "aws_iam_policy_document" "sfn_policy" {
     sid       = "SerializePipeline"
     actions   = ["dynamodb:PutItem", "dynamodb:DeleteItem"]
     resources = [aws_dynamodb_table.pipeline_lock.arn]
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "dynamodb:LeadingKeys"
+      values   = ["pipeline"]
+    }
   }
   statement {
     sid       = "PublishCompletion"

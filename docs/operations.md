@@ -53,6 +53,28 @@ English: verify the enabled rule, today's execution and trigger input, the compl
 matching ingestion manifest, then refresh the dashboard. A list of S3 buckets alone proves none
 of these. 01:00 on 28 September in Vietnam corresponds to snapshot 27 September UTC.
 
+## Dashboard troubleshooting / M? giao di?n v? x? l? l?i
+
+Use [README startup commands](../README.md#run-the-dashboard). Opening a dashboard is independent
+of deploying resources or starting a pipeline execution.
+
+| Symptom | Check / C?ch x? l? |
+| --- | --- |
+| `localhost:8501` cannot open | Start Streamlit and keep its terminal running; read the URL printed in the terminal. |
+| `No module named streamlit` | Install `dashboard/requirements.txt` using the same Python executable that starts the app. |
+| Missing environment settings | Run the full environment-variable block again in this terminal; check each Terraform output succeeded. |
+| Terraform has no outputs | Use the existing stack's state/configuration or obtain output values; a fresh clone contains no private state. |
+| Credentials expired / AssumeRole denied | Check `aws sts get-caller-identity`, your AWS profile/session and the reader's explicit trusted principal. |
+| Pipeline in progress | Wait for the full execution to finish, then Refresh; the guard prevents reading during writes. |
+| Older than 26 hours / mismatched publication | Follow the daily check and recovery steps; do not change timestamps or disable the guard. |
+| Snapshot is yesterday | Normal at 01:00 UTC+7: the partition uses the previous UTC calendar date. |
+| Address already in use | Reuse the existing dashboard or start with `--server.port 8502` and open the printed URL. |
+
+For a deliberate manual ingestion, use the complete Step Functions execution command in Deploy.
+It consumes AWS resources; it is unnecessary just to view current data. Never start individual
+Glue stages to bypass the orchestration. `Ctrl+C` on the local dashboard does not pause AWS;
+use the Pause procedure below when intentionally stopping future scheduled ingestion.
+
 ## Failure and recovery / Xử lý lỗi
 
 A successful, complete board can confirm an absent job closed. A failed/incomplete board cannot;
@@ -81,7 +103,7 @@ staleness after 26 hours; this is expected while paused. Resume by reviewing and
 
 ## Cleanup / Kết thúc lab
 
-**Destructive:** this stack uses `force_destroy=true` on its project buckets. Destroy can empty
+**Destructive when explicitly enabled:** bucket `force_destroy` now defaults to false. An opted-in cleanup can empty
 Bronze, Silver, Gold and state. Export required evidence and data first. Never execute cleanup
 against another project's resources or a shared stack.
 
@@ -93,6 +115,10 @@ against another project's resources or a shared stack.
 ```powershell
 aws sts get-caller-identity
 terraform -chdir=infra state list
+# In terraform.tfvars, set allow_bucket_force_destroy=true ONLY for intentional cleanup.
+# First plan/apply that flag after reviewing its scope; no bucket data is deleted by the flag alone.
+terraform -chdir=infra plan -out=enable-cleanup.tfplan
+terraform -chdir=infra apply enable-cleanup.tfplan
 terraform -chdir=infra plan -destroy -out=cleanup.tfplan
 # Only after reviewing the destructive plan and verifying exports:
 terraform -chdir=infra apply cleanup.tfplan

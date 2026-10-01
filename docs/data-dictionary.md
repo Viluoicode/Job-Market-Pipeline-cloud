@@ -39,7 +39,13 @@ Companies và locations là số giá trị khác nhau theo nguồn; `Unknown` h
 Marked remote = số tin có `is_remote=true` / số tin sau lọc. Tập rỗng hiển thị 0 và thông báo rõ.
 
 Role classification reproduces the eight Gold title-pattern families. A posting can match multiple
-families, so bars must not be summed as unique jobs. Unclassified postings stay visible.
+families, so bars must not be summed as unique jobs. The role chart excludes the unmatched category
+so it does not compress the eight comparable families. Matched/unmatched posting counts and the
+unmatched percentage are displayed separately for the current filtered dataset. Unmatched means
+outside the configured patterns, not necessarily an unrelated job or a failed crawl. Those records
+remain in totals and the table unless a role filter excludes them. The filter labels this category
+"Not matched to the 8 role families". With one selected role category, the left chart shows counts
+by source platform. This presentation change does not alter Gold classification or ingestion.
 The page shows one published snapshot, not a daily-new-jobs count or a market growth chart.
 
 ## Date example / Ví dụ ngày

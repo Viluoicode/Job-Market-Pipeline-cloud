@@ -1,0 +1,76 @@
+{
+  "checked_at": "2026-10-01T06:13:58.125427+00:00",
+  "execution": {
+    "arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:5230fa72-72ab-08ef-faa0-508b4830ba28_63c3bdd4-bd61-486a-0470-0eddc868e7ff",
+    "status": "SUCCEEDED",
+    "start": "2026-10-01 01:00:16.302000+07:00",
+    "stop": "2026-10-01 01:10:44.253000+07:00",
+    "trigger_source": "aws.events",
+    "trigger_type": "Scheduled Event",
+    "rule_arns": [
+      "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule"
+    ]
+  },
+  "publication": {
+    "run_id": "5230fa72-72ab-08ef-faa0-508b4830ba28_63c3bdd4-bd61-486a-0470-0eddc868e7ff",
+    "snapshot_date": "2026-09-30",
+    "ingested_at": "2026-09-30T18:01:50.908092+00:00",
+    "published_at": "2026-09-30T18:10:43.980Z",
+    "ingestion_age_hours": 12.2,
+    "rows_ingested": 7830,
+    "successful_boards": 36,
+    "failed_boards": 0,
+    "incomplete_boards": 1
+  },
+  "dashboard": {
+    "method": "Live AWS Streamlit AppTest with assumed reader; not visual browser inspection",
+    "overview": {
+      "Unique postings": "8,515",
+      "Companies (reported)": "681",
+      "Locations (reported)": "1,203",
+      "Marked remote": "29.6%"
+    },
+    "backend_filter": {
+      "Unique postings": "99",
+      "Companies (reported)": "26",
+      "Locations (reported)": "50",
+      "Marked remote": "40.4%"
+    },
+    "errors": 0,
+    "local_server_health": "ok"
+  },
+  "reader_query": {
+    "id": "420f1d26-ee66-4a09-9759-566fbbcfd910",
+    "bytes_scanned": 1061236,
+    "rows": 8515,
+    "unique_job_ids": 8515
+  },
+  "alarms": [
+    {
+      "name": "jobmarket-aws-pipeline-aborted",
+      "state": "OK"
+    },
+    {
+      "name": "jobmarket-aws-pipeline-failed",
+      "state": "OK"
+    },
+    {
+      "name": "jobmarket-aws-pipeline-timed-out",
+      "state": "OK"
+    },
+    {
+      "name": "jobmarket-aws-pipeline-unhealthy",
+      "state": "OK"
+    },
+    {
+      "name": "jobmarket-aws-source-coverage-low",
+      "state": "OK"
+    }
+  ],
+  "terraform": {
+    "fmt": "PASS",
+    "validate": "PASS",
+    "plan_exit_code": 0,
+    "plan": "No changes"
+  }
+}

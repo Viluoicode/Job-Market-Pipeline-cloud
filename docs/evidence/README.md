@@ -5,6 +5,9 @@ observed at a specific time; they are not a live status page.
 
 | File | Purpose |
 | --- | --- |
+| `handoff-check-20261001.json` | Next EventBridge execution after hardening, fresh reader query, dashboard filters and alarm status |
+| `security-acceptance-20260930.json` | Manual initial run, failed overwrite attempt and recovery; DQ, reader queries and validation |
+| `security-permissions-20260930.json` | Read-only IAM allowed/denied simulations and deployed S3 guardrails |
 | `workshop-validation-20260928.json` | Tests, Terraform validation, UI checks and redacted SNS/alarm status |
 | `workshop-20260928.json` | Current scheduled pipeline and verified dashboard query |
 | `deployment-20260915.json` | Manual end-to-end acceptance after the ingestion and lifecycle upgrade |

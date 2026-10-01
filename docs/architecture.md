@@ -188,11 +188,11 @@ source sample and must not be presented as the whole labor market.
 Security controls are defined mainly in `infra/s3.tf`, `infra/iam.tf`, `infra/ingestion.tf`,
 `infra/schedule.tf`, `infra/monitoring.tf`, and `infra/athena.tf`.
 
-The transform jobs and crawler share a Glue role with object write/delete access across all
-three project buckets. Separating crawler read access from transformation write permissions is
-a remaining least-privilege improvement. The 21 September 2026 review also identified lake
-versioning outside Terraform management and absent TLS-only bucket policies. These findings
-describe improvement work, not security controls already implemented.
+Silver, Gold and the crawler use separate custom IAM roles. Runtime roles cannot modify scripts;
+Step Functions alone among pipeline runtime roles writes the completion marker. The dashboard
+assumes a dedicated reader role for every AWS data-access session. All three buckets enforce HTTPS
+for non-service principals. Ownership and lake/scripts versioning are managed by Terraform.
+See [security-review.md](security-review.md) for the exact read/write matrix and remaining boundaries.
 
 ## Storage lifecycle
 
@@ -203,6 +203,10 @@ describe improvement work, not security controls already implemented.
 | Athena results | 7 days | Query output is reproducible |
 | Glue temporary data | 7 days | Remove abandoned transient data |
 | Silver, Gold, and state | No automatic expiration | Preserve lifecycle and historical analytical state |
+
+Current-object expiration is not permanent version deletion on the versioned lake/scripts buckets.
+Noncurrent versions have no automatic expiration yet; storage and recovery requirements must be
+reviewed before setting one. Nonempty bucket destruction is opt-in via allow_bucket_force_destroy.
 
 ## Design decisions and trade-offs
 
@@ -231,7 +235,7 @@ describe improvement work, not security controls already implemented.
 | Spark jobs, database, and crawler | `infra/glue.tf` |
 | Script uploads and shared contract | `infra/scripts_upload.tf` |
 | Orchestration and completion marker | `infra/stepfunctions.tf` |
-| Runtime permissions | `infra/iam.tf`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf` |
+| Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf.json`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf` |
 | Daily schedule | `infra/schedule.tf` |
 | Monitoring and notification | `infra/monitoring.tf` |
 | Athena and saved queries | `infra/athena.tf` |
