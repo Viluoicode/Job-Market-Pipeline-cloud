@@ -143,3 +143,60 @@ def test_glue_python_shell_arguments_without_job_name(tmp_path, monkeypatch):
 def test_unknown_argument_still_fails_with_glue_runtime_flags():
     with pytest.raises(SystemExit):
         ingest.main(["--JOB_NAME", "ingestion", "--misspelled-argument", "value"])
+
+
+def _fetch(fetch, payload, **kwargs):
+    with httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, json=payload))) as client:
+        return fetch(client, "t", "T", **kwargs)
+
+
+# is_remote is tri-state: True = fully remote, False = onsite or hybrid, None = source gave no signal.
+@pytest.mark.parametrize("location, expected", [
+    ("Remote - US", True),
+    ("Hybrid - New York", False),
+    ("San Francisco, CA", None),        # a city alone does not prove onsite
+    (None, None),
+])
+def test_greenhouse_remote_from_location_text(location, expected):
+    job = {"id": 1, "title": "X", "location": {"name": location} if location else None}
+    assert _fetch(ingest.fetch_greenhouse, {"jobs": [job]})[0]["remote"] is expected
+
+
+@pytest.mark.parametrize("workplace, location, expected", [
+    ("remote", "Berlin", True),
+    ("hybrid", "Remote - EU", False),   # explicit workplace type wins over location text
+    ("onsite", "Paris", False),
+    (None, "Remote", True),
+    (None, "Paris", None),
+])
+def test_lever_remote_from_workplace_type(workplace, location, expected):
+    job = {"id": "a", "text": "X", "categories": {"location": location}}
+    if workplace:
+        job["workplaceType"] = workplace
+    assert _fetch(ingest.fetch_lever, [job])[0]["remote"] is expected
+
+
+@pytest.mark.parametrize("is_remote, workplace, location, expected", [
+    (True, "Hybrid", "London", False),  # Ashby flags hybrid jobs isRemote=True: not fully remote
+    (True, "Remote", "Anywhere", True),
+    (False, "OnSite", "London", False),
+    (True, None, "London", True),
+    (None, None, "Remote, US", True),
+    (None, None, "London", None),
+])
+def test_ashby_remote_prefers_workplace_type(is_remote, workplace, location, expected):
+    job = {"id": "a", "title": "X", "location": location}
+    if is_remote is not None:
+        job["isRemote"] = is_remote
+    if workplace:
+        job["workplaceType"] = workplace
+    assert _fetch(ingest.fetch_ashby, {"jobs": [job]})[0]["remote"] is expected
+
+
+@pytest.mark.parametrize("flag, expected", [(True, True), (False, False), ("missing", None)])
+def test_arbeitnow_remote_flag_or_unknown(flag, expected):
+    job = {"slug": "s", "title": "X"}
+    if flag != "missing":
+        job["remote"] = flag
+    payload = {"data": [job], "links": {"next": None}}
+    assert _fetch(ingest.fetch_arbeitnow, payload)[0]["remote"] is expected

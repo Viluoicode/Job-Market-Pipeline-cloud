@@ -57,9 +57,17 @@ def test_drops_rows_without_source_job_id(bronze):
     assert b2s.build_silver(bronze(rows), "2026-01-01").count() == 1
 
 
-def test_remote_defaults_to_false_when_null(bronze):
-    # A board that omits the remote flag must land as False, never NULL.
+def test_remote_is_tri_state_and_unknown_stays_null(bronze):
+    # Missing remote metadata is unknown, not onsite: NULL must survive into Silver.
     rows = [
         ("greenhouse", "a", "1", "Acme", "X", "NYC", None, "u", "2026-01-01T00:00:00+00:00", "x"),
+        ("greenhouse", "a", "2", "Acme", "Y", "Remote", True, "u", "2026-01-01T00:00:00+00:00", "y"),
+        ("greenhouse", "a", "3", "Acme", "Z", "Paris", False, "u", "2026-01-01T00:00:00+00:00", "z"),
     ]
-    assert b2s.build_silver(bronze(rows), "2026-01-01").collect()[0]["is_remote"] is False
+    got = {r["source_job_id"]: r["is_remote"] for r in b2s.build_silver(bronze(rows), "2026-01-01").collect()}
+    assert got == {"1": None, "2": True, "3": False}
+
+
+def test_dq_ruleset_tolerates_unknown_remote():
+    assert 'IsComplete "is_remote"' not in b2s.DQ_RULESET
+    assert 'Completeness "is_remote" >= 0.3' in b2s.DQ_RULESET

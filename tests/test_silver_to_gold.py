@@ -139,6 +139,24 @@ def test_role_opportunity_decision_columns(spark, fact):
     assert de["job_count"] == 3
     assert de["remote_count"] == 1                 # only "Senior Data Engineer" is remote
     assert de["remote_pct"] == 33.3
+    assert de["remote_unknown_count"] == 0          # every fixture row states remote true/false
+    assert de["remote_unknown_pct"] == 0.0
     assert de["top_company"] == "Databricks"       # 2 DE postings vs Acme's 1
     assert de["top_company_count"] == 2
     assert de["demand_rank"] == 1                  # DE has the highest demand
+
+
+def test_role_opportunity_reports_unknown_remote_separately(spark, bronze):
+    rows = [
+        ("greenhouse", "z", "31", "Z", "Data Engineer", "Remote", True, "u", "2026-01-01T00:00:00+00:00", "q"),
+        ("greenhouse", "z", "32", "Z", "Senior Data Engineer", "Paris", False, "u", "2026-01-01T00:00:00+00:00", "r"),
+        ("greenhouse", "z", "33", "Z", "Staff Data Engineer", "Berlin", None, "u", "2026-01-01T00:00:00+00:00", "s"),
+    ]
+    fact = s2g.build_fact(b2s.build_silver(bronze(rows), SNAPSHOT))
+    opp = s2g.build_role_opportunity(fact, s2g.make_roles_df(spark), SNAPSHOT).collect()
+    de = {r["role"]: r for r in opp}["Data Engineer"]
+    assert de["job_count"] == 3
+    assert de["remote_count"] == 1
+    assert de["remote_pct"] == 33.3                 # share of ALL postings: unknown is not remote
+    assert de["remote_unknown_count"] == 1
+    assert de["remote_unknown_pct"] == 33.3

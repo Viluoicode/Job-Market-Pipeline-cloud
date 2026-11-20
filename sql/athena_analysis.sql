@@ -9,7 +9,7 @@
 
 -- 0) THE DECISION QUERY — the role_opportunity mart in one shot: demand rank, remote share, and
 --    the top hiring company per role. The dashboard derives filtered charts from the fact table.
-SELECT demand_rank, role, job_count, remote_pct, top_company, top_company_count
+SELECT demand_rank, role, job_count, remote_pct, remote_unknown_pct, top_company, top_company_count
 FROM jobmarket_aws_gold.role_opportunity
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.role_opportunity)
 ORDER BY demand_rank;
@@ -20,14 +20,15 @@ FROM jobmarket_aws_gold.demand_by_role
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.demand_by_role)
 ORDER BY job_count DESC;
 
--- 2) Remote-indicated vs not-marked-remote split across all active postings (latest snapshot).
+-- 2) Work-mode split across all active postings (latest snapshot). is_remote is tri-state:
+--    true = remote, false = onsite or hybrid, NULL = the source gave no signal (unknown).
 SELECT
-    is_remote,
+    CASE is_remote WHEN true THEN 'remote' WHEN false THEN 'onsite/hybrid' ELSE 'unknown' END AS work_mode,
     count(*)                                              AS postings,
     round(100.0 * count(*) / sum(count(*)) OVER (), 1)   AS pct
 FROM jobmarket_aws_gold.fact_job_posting
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
-GROUP BY is_remote
+GROUP BY 1
 ORDER BY postings DESC;
 
 -- 3) Top hiring companies (latest snapshot).
@@ -45,12 +46,14 @@ WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_jo
 GROUP BY source
 ORDER BY postings DESC;
 
--- 5) Remote ratio by source (which platforms skew remote).
+-- 5) Remote ratio by source (which platforms skew remote). remote_pct is a share of ALL postings;
+--    unknown_pct shows how much of each source carries no remote signal.
 SELECT
     source,
     count(*)                                                          AS postings,
     sum(if(is_remote, 1, 0))                                          AS remote_postings,
-    round(100.0 * sum(if(is_remote, 1, 0)) / count(*), 1)            AS remote_pct
+    round(100.0 * sum(if(is_remote, 1, 0)) / count(*), 1)            AS remote_pct,
+    round(100.0 * count_if(is_remote IS NULL) / count(*), 1)         AS unknown_pct
 FROM jobmarket_aws_gold.fact_job_posting
 WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
 GROUP BY source

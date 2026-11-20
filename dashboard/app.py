@@ -7,7 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 from data_access import PublicationUnavailable, read_publication, query_fact, create_reader_session
-from model import ROLE_FAMILIES, classify, safe_link
+from model import REMOTE_LABELS, ROLE_FAMILIES, classify, remote_label, safe_link
 
 st.set_page_config(page_title="Job Market | AWS Workshop", page_icon="📊", layout="wide")
 # Static presentation styles only; source text never enters HTML.
@@ -100,6 +100,7 @@ for column in ("title", "company", "location", "source"):
     frame[column] = frame[column].fillna("Unknown")
 FAMILY_COUNT = len(ROLE_FAMILIES)
 frame["roles"] = frame["title"].map(classify)
+frame["work_mode"] = frame["is_remote"].map(remote_label)
 frame["apply_url"] = frame["apply_url"].map(safe_link)
 left, middle, right = st.columns(3)
 sources = left.multiselect("Source platform", sorted(frame.source.unique()))
@@ -109,7 +110,8 @@ roles = middle.multiselect(
 )
 locations = right.multiselect("Location (as reported)", sorted(frame.location.unique()))
 search = st.text_input("Search title or company", placeholder="For example: data engineer")
-remote_only = st.checkbox("Only postings marked remote")
+work_modes = st.multiselect("Work mode", REMOTE_LABELS,
+                            help="Unknown = the source gave no remote/onsite signal; it is not counted as remote.")
 filtered = frame
 if sources:
     filtered = filtered[filtered.source.isin(sources)]
@@ -121,15 +123,17 @@ if search.strip():
     needle = search.strip()
     filtered = filtered[filtered.title.str.contains(needle, case=False, regex=False) |
                         filtered.company.str.contains(needle, case=False, regex=False)]
-if remote_only:
-    filtered = filtered[filtered.is_remote]
+if work_modes:
+    filtered = filtered[filtered.work_mode.isin(work_modes)]
 
 cards = st.columns(4)
 cards[0].metric("Unique postings", f"{len(filtered):,}")
 cards[1].metric("Companies (reported)", f"{filtered.company.nunique():,}")
 cards[2].metric("Locations (reported)", f"{filtered.location.nunique():,}")
-remote_share = 100 * filtered.is_remote.mean() if len(filtered) else 0
-cards[3].metric("Marked remote", f"{remote_share:.1f}%")
+mode_share = filtered.work_mode.value_counts(normalize=True).mul(100) if len(filtered) else {}
+cards[3].metric("Remote (of all postings)", f"{mode_share.get('Remote', 0):.1f}%",
+                help=f"Onsite / hybrid {mode_share.get('Onsite / hybrid', 0):.1f}% · "
+                     f"Unknown {mode_share.get('Unknown', 0):.1f}%. Unknown is never counted as remote.")
 unmatched_count = int(filtered["roles"].map(lambda values: "Unclassified" in values).sum())
 matched_count = len(filtered) - unmatched_count
 unmatched_share = 100 * unmatched_count / len(filtered) if len(filtered) else 0
@@ -163,12 +167,13 @@ else:
     col2.plotly_chart(style_chart(px.bar(companies, x="Postings", y="company", orientation="h", title="Top 10 companies in this view",
                             labels={"company": ""}, color_discrete_sequence=["#3D8060"])), width="stretch", theme=None)
 st.caption("The role chart includes matched families only; each posting belongs to exactly one family. "
-           "Not marked remote does not mean confirmed onsite. All metrics follow the filters above.")
+           "Work mode Unknown means the source gave no remote signal; it is not counted as remote or onsite. "
+           "All metrics follow the filters above.")
 st.subheader("Explore the actual postings")
-st.dataframe(filtered[["title", "company", "location", "source", "is_remote", "last_seen_at", "apply_url"]],
+st.dataframe(filtered[["title", "company", "location", "source", "work_mode", "last_seen_at", "apply_url"]],
     hide_index=True, width="stretch",
     column_config={"apply_url": st.column_config.LinkColumn("Original posting", display_text="Open posting"),
-                   "is_remote": "Marked remote", "last_seen_at": "Last observed (UTC)"})
+                   "work_mode": "Work mode", "last_seen_at": "Last observed (UTC)"})
 with st.expander("Data scope and verification"):
     st.write("These records were active and fresh when Gold was built. Availability can change afterwards; "
              "verify on the original employer page. This workshop does not rank personal suitability or cover Vietnam specifically.")

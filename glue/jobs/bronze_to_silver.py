@@ -35,12 +35,14 @@ from pipeline_contract import read_json, silver_path, timestamp, validate_manife
 # (not_null / unique / accepted_values). Rules are written in DQDL (Data Quality Definition
 # Language); EvaluateDataQuality runs them inside the job and publishes a score to the Glue
 # Data Quality console. Chosen to assert the invariants the transform is supposed to guarantee.
+# is_remote is tri-state (NULL = unknown). About 52% of live postings carry a remote signal
+# (2026-11-20 crawl); the 0.3 floor fails only if a connector stops emitting it altogether.
 DQ_RULESET = """Rules = [
     RowCount > 0,
     IsComplete "job_id",
     IsUnique "job_id",
     IsComplete "dedup_hash",
-    IsComplete "is_remote",
+    Completeness "is_remote" >= 0.3,
     ColumnValues "source" in [ "greenhouse", "lever", "ashby", "arbeitnow" ],
     Completeness "company" >= 0.9
 ]"""
@@ -136,7 +138,8 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
             F.col("company").cast("string").alias("company"),
             F.col("title").cast("string").alias("title"),
             F.col("location").cast("string").alias("location"),
-            F.coalesce(F.col("remote").cast("boolean"), F.lit(False)).alias("is_remote"),
+            # Tri-state: NULL = the source gave no remote signal (unknown), never coerced to onsite.
+            F.col("remote").cast("boolean").alias("is_remote"),
             F.col("apply_url").cast("string").alias("apply_url"),
             parse_ts("posted_at").alias("posted_at"),
             F.col("description").cast("string").alias("description"),

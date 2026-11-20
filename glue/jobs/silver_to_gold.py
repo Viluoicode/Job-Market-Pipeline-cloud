@@ -178,12 +178,19 @@ def build_demand_by_role(fact: DataFrame, roles_df: DataFrame, snapshot_date: st
 
 
 def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: str) -> DataFrame:
-    """Decision mart: per role, demand rank + remote share + the single top-hiring company."""
+    """Decision mart: per role, demand rank + remote share + the single top-hiring company.
+
+    is_remote is tri-state. remote_pct = remote / ALL postings of the role (a lower bound: unknown
+    is not counted as remote), and remote_unknown_pct shows how much of the role has no signal.
+    Dividing by known postings only would overstate remote work: Greenhouse exposes the flag
+    mainly through "Remote" in the location text, so its known postings skew remote.
+    """
     bridge = _role_bridge(fact, roles_df)
 
     demand = bridge.groupBy("role").agg(
         F.countDistinct("job_id").alias("job_count"),
-        F.sum(F.col("is_remote").cast("int")).alias("remote_count"),
+        F.count(F.when(F.col("is_remote"), 1)).alias("remote_count"),
+        F.count(F.when(F.col("is_remote").isNull(), 1)).alias("remote_unknown_count"),
     )
 
     # Top-hiring company per role: rank companies by distinct postings, keep #1 (name breaks ties).
@@ -199,10 +206,12 @@ def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: 
     return (
         demand.join(top_company, "role", "left")
         .withColumn("remote_pct", F.round(100.0 * F.col("remote_count") / F.col("job_count"), 1))
+        .withColumn("remote_unknown_pct", F.round(100.0 * F.col("remote_unknown_count") / F.col("job_count"), 1))
         .withColumn("demand_rank", F.row_number().over(rank_win))
         .withColumn("snapshot_date", F.lit(snapshot_date).cast("date"))
         .select(
             "demand_rank", "role", "job_count", "remote_count", "remote_pct",
+            "remote_unknown_count", "remote_unknown_pct",
             "top_company", "top_company_count", "snapshot_date",
         )
         .orderBy("demand_rank")
@@ -263,7 +272,7 @@ def main() -> None:
     for row in opportunity.collect():
         print(
             f"    #{row['demand_rank']} {row['role']:<28} demand={row['job_count']:<5} "
-            f"remote={row['remote_pct']}%  top={row['top_company']} ({row['top_company_count']})"
+            f"remote={row['remote_pct']}% (unknown {row['remote_unknown_pct']}%)  top={row['top_company']} ({row['top_company_count']})"
         )
 
     job.commit()

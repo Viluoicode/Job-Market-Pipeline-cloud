@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "dashboard"))
 import data_access as data
-from model import DEFAULT_ROLES, ROLE_EXCLUDE, ROLE_FAMILIES, classify, safe_link
+from model import DEFAULT_ROLES, ROLE_EXCLUDE, ROLE_FAMILIES, classify, remote_label, safe_link
 
 
 def publication():
@@ -64,9 +64,10 @@ def test_pagination_does_not_drop_second_page_first_record():
     def row(*values): return {"Data": [{"VarCharValue": v} for v in values]}
     athena.get_paginator.return_value.paginate.return_value = [
         {"ResultSet": {"Rows": [row("job_id", "is_remote"), row("1", "true")]}},
-        {"ResultSet": {"Rows": [row("2", "false")]}}]
+        {"ResultSet": {"Rows": [row("2", "false"), {"Data": [{"VarCharValue": "3"}, {}]}]}}]
     records, _ = data.query_fact(session, "db", "wg", "2026-09-27")
-    assert records == [{"job_id": "1", "is_remote": True}, {"job_id": "2", "is_remote": False}]
+    assert records == [{"job_id": "1", "is_remote": True}, {"job_id": "2", "is_remote": False},
+                       {"job_id": "3", "is_remote": None}]          # Athena omits VarCharValue for NULL
     sql = athena.start_query_execution.call_args.kwargs["QueryString"]
     assert "snapshot_date = '2026-09-27'" in sql
     with pytest.raises(data.PublicationUnavailable, match="limit"):
@@ -157,3 +158,16 @@ def test_dashboard_assume_failure_has_no_fallback():
     base.client.return_value.assume_role.side_effect = RuntimeError("AccessDenied")
     with pytest.raises(RuntimeError, match="AccessDenied"):
         data.create_reader_session("ap-southeast-1", "arn:aws:iam::123456789012:role/reader", base_session=base)
+
+
+def test_remote_label_has_three_groups():
+    assert remote_label(True) == "Remote"
+    assert remote_label(False) == "Onsite / hybrid"
+    assert remote_label(None) == "Unknown"
+
+
+def test_remote_label_handles_pandas_values():
+    import numpy as np
+    import pandas as pd
+    assert pd.Series([True, False]).map(remote_label).tolist() == ["Remote", "Onsite / hybrid"]  # numpy.bool_
+    assert [remote_label(v) for v in (np.nan, pd.NA, np.True_)] == ["Unknown", "Unknown", "Remote"]
