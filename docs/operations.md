@@ -53,12 +53,12 @@ English: verify the enabled rule, today's execution and trigger input, the compl
 matching ingestion manifest, then refresh the dashboard. A list of S3 buckets alone proves none
 of these. 01:00 on 28 September in Vietnam corresponds to snapshot 27 September UTC.
 
-## Dashboard troubleshooting / M? giao di?n v? x? l? l?i
+## Dashboard troubleshooting / Mở giao diện và xử lý lỗi
 
 Use [README startup commands](../README.md#run-the-dashboard). Opening a dashboard is independent
 of deploying resources or starting a pipeline execution.
 
-| Symptom | Check / C?ch x? l? |
+| Symptom | Check / Cách xử lý |
 | --- | --- |
 | `localhost:8501` cannot open | Start Streamlit and keep its terminal running; read the URL printed in the terminal. |
 | `No module named streamlit` | Install `dashboard/requirements.txt` using the same Python executable that starts the app. |

@@ -1,0 +1,14 @@
+# Every editor (VS Code via the EditorConfig extension, JetBrains natively) saves UTF-8 + LF.
+# Non-UTF-8 saves (e.g. PowerShell redirection) once turned Vietnamese text into "?" and
+# em dashes into mojibake; tests/test_encoding.py fails CI if that happens again.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+
+[*.{png,jpg,jpeg,gif,ico}]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset

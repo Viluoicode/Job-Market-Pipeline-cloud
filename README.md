@@ -94,11 +94,11 @@ There are three separate actions:
 | Action | Where it runs | When you need it |
 | --- | --- | --- |
 | Deploy with Terraform | Creates/updates AWS resources | First setup or reviewed infrastructure/code changes |
-| Run the pipeline | AWS: EventBridge ? Step Functions ? Glue | Automatically at 01:00 UTC+7; optional manual full execution |
+| Run the pipeline | AWS: EventBridge → Step Functions → Glue | Automatically at 01:00 UTC+7; optional manual full execution |
 | Open the dashboard | Your computer; reads published AWS data | Whenever you want to inspect results |
 
-**VI:** Stack hi?n t?i ?? deploy v? b?t l?ch. ?? xem d? li?u, ch? m? dashboard; kh?ng c?n
-`terraform apply` hay ch?y l?i Glue. T?t m?y kh?ng d?ng l?ch AWS. Dashboard kh?ng crawl d? li?u.
+**VI:** Stack hiện tại đã deploy và bật lịch. Để xem dữ liệu, chỉ mở dashboard; không cần
+`terraform apply` hay chạy lại Glue. Tắt máy không dừng lịch AWS. Dashboard không crawl dữ liệu.
 
 Run PowerShell from the repository root (the folder containing this README, `infra/` and `dashboard/`).
 Use an authenticated AWS profile authorized to assume the configured dashboard reader.

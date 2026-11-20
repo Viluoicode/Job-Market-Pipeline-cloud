@@ -1,5 +1,5 @@
 # ============================================================================================
-# IAM â€” one role for Glue (jobs + crawler), one for the Step Functions state machine.
+# IAM — one role for Glue (jobs + crawler), one for the Step Functions state machine.
 # ============================================================================================
 
 # ---- Glue role -----------------------------------------------------------------------------

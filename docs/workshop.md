@@ -57,9 +57,9 @@ Follow [Run the dashboard in README](../README.md#run-the-dashboard) for the can
 one-time setup and per-terminal commands. Reuse your existing environment or create `.venv`.
 The dashboard does not require Java or a local Spark runtime.
 
-**VI:** M? PowerShell t?i root repo ? x?c th?c AWS ? ??t s?u bi?n m?i tr??ng theo README ?
-ch?y Streamlit ? m? **http://localhost:8501** ? b?m **Refresh data**. Gi? terminal m?;
-`Ctrl+C` ch? d?ng giao di?n, l?ch AWS v?n ch?y. Kh?ng c?n deploy l?i ?? xem d? li?u.
+**VI:** Mở PowerShell tại root repo → xác thực AWS → đặt sáu biến môi trường theo README →
+chạy Streamlit → mở **http://localhost:8501** → bấm **Refresh data**. Giữ terminal mở;
+`Ctrl+C` chỉ dừng giao diện, lịch AWS vẫn chạy. Không cần deploy lại để xem dữ liệu.
 
 **EN:** The existing stack continues ingestion independently. Starting Streamlit only reads the
 published snapshot; it does not start ingestion. A fresh clone needs the existing stack settings
@@ -131,29 +131,29 @@ Requirements reviewed 28 September 2026:
 
 ### Architecture artifact placement
 
-1. L?u file s?a ???c ? `docs/diagrams/architecture.drawio`; xu?t `architecture.png` (ho?c SVG)
-   v?o c?ng th? m?c. T?o th? m?c khi c? artifact th?t; kh?ng commit ?nh placeholder.
-2. Trong **README ? Architecture**, ??t ?nh ngay d??i heading, tr??c ?o?n gi?i th?ch lu?ng:
+1. Lưu file sửa được ở `docs/diagrams/architecture.drawio`; xuất `architecture.png` (hoặc SVG)
+   vào cùng thư mục. Tạo thư mục khi có artifact thật; không commit ảnh placeholder.
+2. Trong **README → Architecture**, đặt ảnh ngay dưới heading, trước đoạn giải thích luồng:
 
    ```markdown
    ![AWS architecture](docs/diagrams/architecture.png)
    ```
 
-   Thay Mermaid b?ng ?nh ho?c ??a Mermaid v?o kh?i thu g?n; gi? ph?n m? t? v? link t?i li?u.
-3. Trong `docs/architecture.md`, th?m ?nh `![AWS architecture](diagrams/architecture.png)`
-   ngay d??i ti?u ?? ch?nh v? link `[Editable diagram](diagrams/architecture.drawio)`.
-4. ??i chi?u b?n v? v?i deployment: AWS region Singapore; API v? local Streamlit ? ngo?i AWS;
-   EventBridge ? Step Functions, DynamoDB lock, ba Glue jobs, S3 lake Bronze/Silver/Gold,
-   crawler ? Catalog ? Athena, bucket scripts v? Athena results; health Lambda ? CloudWatch ? SNS.
-   D?ng n?t kh?c nhau cho orchestration v? data; kh?ng t? th?m VPC/NAT/subnet ch?a tri?n khai.
-5. IAM: th? hi?n role Silver, Gold, Crawler ri?ng v? dashboard assume reader role. ??i chi?u
-   [ma tr?n quy?n](security-review.md), kh?ng d?ng role Glue chung c?a thi?t k? c?.
+   Thay Mermaid bằng ảnh hoặc đưa Mermaid vào khối thu gọn; giữ phần mô tả và link tài liệu.
+3. Trong `docs/architecture.md`, thêm ảnh `![AWS architecture](diagrams/architecture.png)`
+   ngay dưới tiêu đề chính và link `[Editable diagram](diagrams/architecture.drawio)`.
+4. Đối chiếu bản vẽ với deployment: AWS region Singapore; API và local Streamlit ở ngoài AWS;
+   EventBridge → Step Functions, DynamoDB lock, ba Glue jobs, S3 lake Bronze/Silver/Gold,
+   crawler → Catalog → Athena, bucket scripts và Athena results; health Lambda → CloudWatch → SNS.
+   Dùng nét khác nhau cho orchestration và data; không tự thêm VPC/NAT/subnet chưa triển khai.
+5. IAM: thể hiện role Silver, Gold, Crawler riêng và dashboard assume reader role. Đối chiếu
+   [ma trận quyền](security-review.md), không dùng role Glue chung của thiết kế cũ.
 
 EN: Commit both editable diagram and export. Embed the export in README's Architecture section,
 and link its source from the detailed architecture document. The diagram must reflect deployed
 resources and the separate runtime roles, not an unimplemented target design.
 
-### Final handoff checklist / Ki?m tra tr??c commit
+### Final handoff checklist / Kiểm tra trước commit
 
 - [x] Pipeline, daily schedule, lifecycle/DQ, monitoring and reader-role dashboard verified on AWS.
 - [x] Security acceptance and same-day overwrite recovery documented (30 September).
