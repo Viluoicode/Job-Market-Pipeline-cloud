@@ -160,7 +160,8 @@ The date boundary is UTC. For example, a run at 01:00 on 17 September in UTC+7 s
 | `demand_by_role` | One configured role family per snapshot | Compare distinct posting demand |
 | `role_opportunity` | One configured role family per snapshot | Rank demand and expose remote share and top employer |
 
-One posting may match more than one title-based role family. These marts describe the configured
+Each posting belongs to at most one title-based role family (first match by priority; see
+[data-dictionary.md](data-dictionary.md#role-families--nhóm-role)), so role counts add up. These marts describe the configured
 source sample and must not be presented as the whole labor market.
 
 ## Reliability and failure containment

@@ -11,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "dashboard"))
 import data_access as data
-from model import DEFAULT_ROLES, classify, safe_link
+from model import DEFAULT_ROLES, ROLE_EXCLUDE, ROLE_FAMILIES, classify, safe_link
 
 
 def publication():
@@ -73,13 +73,57 @@ def test_pagination_does_not_drop_second_page_first_record():
         data.query_fact(session, "db", "wg", "2026-09-27", max_rows=1)
 
 
-def test_title_rules_match_gold_and_keep_unclassified():
+def _gold_constant(name):
     tree = ast.parse((ROOT / "glue/jobs/silver_to_gold.py").read_text(encoding="utf-8"))
-    gold = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
-                and any(isinstance(t, ast.Name) and t.id == "DEFAULT_ROLES" for t in n.targets))
-    assert DEFAULT_ROLES == gold
-    assert classify("Data Engineer / Backend Developer") == ["Backend Engineer", "Data Engineer"]
+    return next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign)
+                and any(isinstance(t, ast.Name) and t.id == name for t in n.targets))
+
+
+def test_title_rules_match_gold_and_keep_unclassified():
+    assert DEFAULT_ROLES == _gold_constant("DEFAULT_ROLES")
+    assert ROLE_EXCLUDE == _gold_constant("ROLE_EXCLUDE")
+    assert classify("Data Engineer / Backend Developer") == ["Data Engineer"]   # one role, by priority
     assert classify("Accountant") == ["Unclassified"]
+
+
+def test_title_rules_match_whole_words_only():
+    assert classify("Senior HTML Engineer") == ["Unclassified"]
+    assert classify("Customer Success Rep - Platform Engineering") == ["Unclassified"]
+    assert classify("ML Engineer, Search") == ["ML / AI Engineer"]
+    assert classify("Site Reliability Engineer (SRE)") == ["DevOps / SRE / Platform"]
+    assert classify("Senior Front-End Engineer") == ["Frontend Engineer"]
+
+
+@pytest.mark.parametrize("title, role", [
+    # Real titles from the configured boards (2026-11-20 crawl).
+    ("Software Engineer, Backend", "Backend Engineer"),                       # qualifier form
+    ("Staff Software Engineer, Data Platform", "Data Engineer"),
+    ("Software Engineer, Infrastructure Security", "Security Engineer"),
+    ("Software Engineer - Observability", "DevOps / SRE / Platform"),
+    ("Sr. Software Engineer, iOS", "Mobile Engineer"),
+    ("Software Engineer II, Full Stack", "Full Stack Engineer"),
+    ("Forward Deployed Engineer (FDE), Healthcare - Seattle", "Forward Deployed / Solutions"),
+    ("Senior Solutions Architect", "Forward Deployed / Solutions"),
+    ("Machine Learning Engineering Manager II", "Engineering Manager"),       # manager beats specialty
+    ("Applied AI Engineer, Codex", "ML / AI Engineer"),
+    ("Research Engineer, Benchmarks & Evaluation", "Research Scientist / Engineer"),
+    ("Senior Applied Scientist II, Ads Optimization", "Data Scientist"),
+    ("Finance Business Intelligence Analyst", "Data Analyst / BI"),
+    ("Technical Support Engineer", "Technical Support Engineer"),
+    ("Software Engineer, Banking", "Software Engineer (General)"),
+    ("Member of Technical Staff, Post-Training", "Software Engineer (General)"),
+    ("Sr. Product Manager, Data Engineering", "Unclassified"),                # exclusion
+    ("Executive Assistant to Head of Engineering", "Unclassified"),
+    ("Market Researcher", "Unclassified"),
+    ("Enterprise Account Executive", "Unclassified"),
+])
+def test_role_taxonomy_on_real_titles(title, role):
+    assert classify(title) == [role]
+
+
+def test_every_family_has_a_single_canonical_name():
+    assert len(ROLE_FAMILIES) == 15
+    assert "Unclassified" not in ROLE_FAMILIES
 
 
 def test_only_web_links_are_clickable():

@@ -7,7 +7,7 @@ import plotly.express as px
 import streamlit as st
 
 from data_access import PublicationUnavailable, read_publication, query_fact, create_reader_session
-from model import classify, safe_link
+from model import ROLE_FAMILIES, classify, safe_link
 
 st.set_page_config(page_title="Job Market | AWS Workshop", page_icon="📊", layout="wide")
 # Static presentation styles only; source text never enters HTML.
@@ -98,13 +98,14 @@ if metadata["incomplete_boards"] or metadata["failed_boards"]:
 frame = pd.DataFrame(rows)
 for column in ("title", "company", "location", "source"):
     frame[column] = frame[column].fillna("Unknown")
+FAMILY_COUNT = len(ROLE_FAMILIES)
 frame["roles"] = frame["title"].map(classify)
 frame["apply_url"] = frame["apply_url"].map(safe_link)
 left, middle, right = st.columns(3)
 sources = left.multiselect("Source platform", sorted(frame.source.unique()))
 roles = middle.multiselect(
     "Role family", sorted({role for values in frame.roles for role in values}),
-    format_func=lambda role: "Not matched to the 8 role families" if role == "Unclassified" else role,
+    format_func=lambda role: f"Not matched to the {FAMILY_COUNT} role families" if role == "Unclassified" else role,
 )
 locations = right.multiselect("Location (as reported)", sorted(frame.location.unique()))
 search = st.text_input("Search title or company", placeholder="For example: data engineer")
@@ -133,12 +134,13 @@ unmatched_count = int(filtered["roles"].map(lambda values: "Unclassified" in val
 matched_count = len(filtered) - unmatched_count
 unmatched_share = 100 * unmatched_count / len(filtered) if len(filtered) else 0
 st.markdown(
-    f"**Role coverage in this view:** {matched_count:,} postings match at least one of the 8 role families · "
+    f"**Role coverage in this view:** {matched_count:,} postings match one of the {FAMILY_COUNT} role families · "
     f"**{unmatched_count:,} not matched ({unmatched_share:.1f}%)**."
 )
 st.caption(
-    "Not matched means the title does not match the configured keywords: it may be outside the "
-    "8 families or missed by the rules. These postings remain in the totals and table unless filtered out."
+    "Not matched means the title does not match the configured rules: it may be outside the "
+    f"{FAMILY_COUNT} families (sales, marketing, hardware…) or missed by the rules. These postings remain "
+    "in the totals and table unless filtered out."
 )
 if filtered.empty:
     st.info("No postings match these filters. Clear a filter to broaden the view.")
@@ -153,14 +155,14 @@ else:
             source_counts, x="Postings", y="source", orientation="h", title="Postings by source platform",
             labels={"source": ""}, color_discrete_sequence=["#15803D"])), width="stretch", theme=None)
     elif role_counts.empty:
-        col1.info("No postings in this view match the 8 role families. They are still shown in the table.")
+        col1.info(f"No postings in this view match the {FAMILY_COUNT} role families. They are still shown in the table.")
     else:
         col1.plotly_chart(style_chart(px.bar(
-            role_counts, x="Postings", y="roles", orientation="h", title="Postings matching the 8 role families",
+            role_counts, x="Postings", y="roles", orientation="h", title=f"Postings by role family ({FAMILY_COUNT} families)",
             labels={"roles": ""}, color_discrete_sequence=["#15803D"])), width="stretch", theme=None)
     col2.plotly_chart(style_chart(px.bar(companies, x="Postings", y="company", orientation="h", title="Top 10 companies in this view",
                             labels={"company": ""}, color_discrete_sequence=["#3D8060"])), width="stretch", theme=None)
-st.caption("The role chart includes matched families only; one posting may appear in multiple families. "
+st.caption("The role chart includes matched families only; each posting belongs to exactly one family. "
            "Not marked remote does not mean confirmed onsite. All metrics follow the filters above.")
 st.subheader("Explore the actual postings")
 st.dataframe(filtered[["title", "company", "location", "source", "is_remote", "last_seen_at", "apply_url"]],
