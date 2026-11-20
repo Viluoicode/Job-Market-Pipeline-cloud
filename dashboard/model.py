@@ -76,6 +76,22 @@ def classify(title):
     return ["Unclassified"]
 
 
+# is_remote is tri-state: True = fully remote, False = onsite or hybrid, None = no signal.
+REMOTE_LABELS = ["Remote", "Onsite / hybrid", "Unknown"]
+
+
+def remote_label(value):
+    """Label for one is_remote value; accepts Python/numpy booleans and None/NaN/pd.NA as unknown."""
+    try:
+        if value == True:  # noqa: E712 - numpy.bool_ is not `True`, but compares equal
+            return "Remote"
+        if value == False:  # noqa: E712
+            return "Onsite / hybrid"
+    except TypeError:  # pd.NA cannot be coerced to bool
+        pass
+    return "Unknown"
+
+
 def safe_link(value):
     value = str(value or "")
     parsed = urlparse(value)

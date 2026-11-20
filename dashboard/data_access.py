@@ -102,7 +102,8 @@ def query_fact(session, database, workgroup, snapshot_date, *, timeout=120, max_
                 header = cells
                 continue
             record = dict(zip(header, cells))
-            record["is_remote"] = record.get("is_remote") == "true"
+            # Tri-state: Athena omits VarCharValue for NULL, which means "unknown", not onsite.
+            record["is_remote"] = {"true": True, "false": False}.get(record.get("is_remote"))
             records.append(record)
             if len(records) > max_rows:
                 raise PublicationUnavailable("Dataset exceeds the workshop display limit; no partial totals are shown.")

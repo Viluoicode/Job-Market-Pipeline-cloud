@@ -76,10 +76,6 @@ def get_str(obj, key):
     return None
 
 
-def get_bool(obj, key) -> bool:
-    return isinstance(obj, dict) and obj.get(key) is True
-
-
 def get_child(obj, key):
     if isinstance(obj, dict) and isinstance(obj.get(key), dict):
         return obj[key]
@@ -102,8 +98,28 @@ def get_id(obj, key):
     return None
 
 
-def _looks_remote(*values) -> bool:
-    return any(v and "remote" in v.lower() for v in values)
+# Bronze "remote" is tri-state: True = fully remote, False = onsite or hybrid, None = no signal.
+# A plain city ("Paris") is not evidence of onsite work, so it stays None rather than False.
+_NOT_REMOTE_WORDS = ("hybrid", "on-site", "onsite", "in office", "in-office")
+
+
+def _remote_from_text(*values):
+    text = " ".join(v.lower() for v in values if isinstance(v, str))
+    if "remote" in text:
+        return True
+    if any(word in text for word in _NOT_REMOTE_WORDS):
+        return False
+    return None
+
+
+def _remote_from_workplace(workplace):
+    """Map an explicit workplace type (Lever/Ashby) to the tri-state flag; None if absent/unknown."""
+    workplace = (workplace or "").strip().lower().replace("-", "").replace(" ", "")
+    if workplace == "remote":
+        return True
+    if workplace in ("hybrid", "onsite"):
+        return False
+    return None
 
 
 def _record(source, board_token, source_job_id, company, title, location, remote,
@@ -168,7 +184,7 @@ def fetch_greenhouse(client, token, company_hint):
         company = get_str(job, "company_name") or company_hint or token
         out.append(_record(
             "greenhouse", token, jid, company,
-            get_str(job, "title") or "", location, _looks_remote(location),
+            get_str(job, "title") or "", location, _remote_from_text(location),
             strip_html(get_str(job, "content")),
             get_str(job, "absolute_url") or "",
             parse_iso(get_str(job, "updated_at") or get_str(job, "first_published")),
@@ -190,8 +206,9 @@ def fetch_lever(client, token, company_hint):
         location = get_str(cats, "location") if cats else None
         commitment = get_str(cats, "commitment") if cats else None
         description = get_str(job, "descriptionPlain") or strip_html(get_str(job, "description"))
-        workplace = (get_str(job, "workplaceType") or "").lower()
-        remote = workplace == "remote" or _looks_remote(location, commitment)
+        remote = _remote_from_workplace(get_str(job, "workplaceType"))
+        if remote is None:
+            remote = _remote_from_text(location, commitment)
         created = job.get("createdAt")
         posted_at = from_epoch_ms(created) if isinstance(created, int) and not isinstance(created, bool) else None
         out.append(_record(
@@ -215,9 +232,14 @@ def fetch_ashby(client, token, company_hint):
         if not jid:
             raise ValueError("Ashby job is missing its id")
         description = get_str(job, "descriptionPlain") or strip_html(get_str(job, "descriptionHtml"))
+        location = get_str(job, "location")
+        # workplaceType first: Ashby sets isRemote=True on Hybrid jobs, which are not fully remote.
+        remote = _remote_from_workplace(get_str(job, "workplaceType"))
+        if remote is None:
+            remote = job["isRemote"] if isinstance(job.get("isRemote"), bool) else _remote_from_text(location)
         out.append(_record(
             "ashby", token, jid, company_hint or token,
-            get_str(job, "title") or "", get_str(job, "location"), get_bool(job, "isRemote"),
+            get_str(job, "title") or "", location, remote,
             description or "",
             get_str(job, "jobUrl") or get_str(job, "applyUrl") or "",
             parse_iso(get_str(job, "publishedAt")),
@@ -244,7 +266,8 @@ def fetch_arbeitnow(client, token, company_hint, max_pages=2, with_completeness=
             posted_at = from_epoch_ms(created * 1000) if isinstance(created, int) and not isinstance(created, bool) else None
             out.append(_record(
                 "arbeitnow", "arbeitnow", slug, company,
-                get_str(job, "title") or "", get_str(job, "location"), get_bool(job, "remote"),
+                get_str(job, "title") or "", get_str(job, "location"),
+                job["remote"] if isinstance(job.get("remote"), bool) else None,
                 strip_html(get_str(job, "description")),
                 get_str(job, "url") or "",
                 posted_at, job,
