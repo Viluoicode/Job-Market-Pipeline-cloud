@@ -68,9 +68,7 @@ flowchart TD
 
 Solid arrows primarily show data/metadata movement; dashed arrows label control or metric paths.
 Step Functions conditionally releases its DynamoDB lock after publication or caught failure;
-abort/timeout recovery requires the runbook. This explanatory Mermaid is not the final
-learner-authored AWS-icon diagram. The learner should draw the final diagram with official AWS icons, distinguish control from data
-flows, and verify each service, permission and connection against Terraform. See [workshop.md](workshop.md).
+abort/timeout recovery requires the [runbook](operations.md).
 
 The state machine is the only authorized production write path. A run identifier and the UTC date
 of the execution are fixed at workflow start and passed to every stage.
