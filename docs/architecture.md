@@ -122,7 +122,8 @@ uncommitted input. It never scans accumulated Bronze and relabels old observatio
 `job_id` is the lowercase SHA-256 of `source|board_token|source_job_id`. Including the board avoids
 collisions when different employers reuse an internal source ID. `dedup_hash` is derived from
 normalized company, title, and location and is used for cross-source content deduplication in
-Gold.
+Gold. Among copies with the same `dedup_hash`, Gold keeps the most recently observed one
+(`last_seen_at`), then the one reporting `posted_at`, then the lowest `job_id` for determinism.
 
 | Observation | Silver state | Gold eligibility |
 | --- | --- | --- |
