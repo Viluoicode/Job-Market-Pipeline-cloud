@@ -49,12 +49,7 @@ flowchart LR
 The workflow publishes completion only after ingestion, Silver checks, Gold and the current crawl
 succeed. The dashboard checks the writer lock and matching publication metadata before and after
 reading the published partition. Full data/control paths, security boundaries and trade-offs are
-in [architecture.md](docs/architecture.md). This Mermaid is an explanatory map; the learner's final
-AWS-icon diagram is still to be added here. Save the editable source as
-`docs/diagrams/architecture.drawio` and its export as `docs/diagrams/architecture.png`.
-Place `![AWS architecture](docs/diagrams/architecture.png)` immediately below this Architecture
-heading once the file exists; replace or collapse the Mermaid overview to avoid duplicate diagrams.
-See the [diagram handoff instructions](docs/workshop.md#architecture-artifact-placement).
+in [architecture.md](docs/architecture.md).
 
 Security hardening was deployed on **30 September 2026**: separate stage roles, a restricted
 dashboard reader, HTTPS-only bucket access and deliberate cleanup controls. See the
@@ -169,7 +164,7 @@ docs/         Lab, architecture, runbooks, costs and evidence
 ## Limits and cost
 
 This is a bounded workshop, not a hardened multi-user production service. Arbeitnow pagination is
-capped; title-based roles overlap; missing remote metadata does not mean onsite. Gold publication
+capped; role families are title-based heuristics (one family per posting); missing remote metadata does not mean onsite. Gold publication
 is not an atomic transaction across marts. Stage-specific roles, an assumed dashboard reader, HTTPS bucket policies and versioning are
 managed by Terraform. See the [security review](docs/security-review.md) for remaining boundaries. See [metric definitions](docs/data-dictionary.md).
 
@@ -177,16 +172,6 @@ Daily Glue and supporting AWS services incur charges even when credits offset th
 do not cap spending. Read [cost assumptions and security](docs/cost-and-security.md) and
 [cleanup instructions](docs/operations.md#cleanup--kết-thúc-lab) before deployment or retirement.
 Destroying this stack can delete retained data.
-
-## Workshop handoff
-
-The implemented pipeline, security changes and local dashboard have passed live acceptance.
-The scheduled run on **1 October 2026 at 01:00 UTC+7** also succeeded; see
-[the dated handoff check](docs/evidence/handoff-check-20261001.json). Four dashboard PNGs exist in
-`docs/screenshots/`; review their framing/dates before embedding them. The learner-verified AWS-icon
-diagram, demo video, saved Pricing Calculator estimate and bilingual report website still need
-to be supplied before claiming full program submission. See
-[the handoff checklist](docs/workshop.md#8-bàn-giao-workshop--submission-boundary).
 
 ## License
 
