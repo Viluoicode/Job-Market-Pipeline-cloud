@@ -2,7 +2,7 @@
 
 Builds a tiny Silver frame via ``build_silver`` (so the fixtures are realistic), then asserts:
   * fact_job_posting  — cross-source content dedup keeps one row per dedup_hash.
-  * demand_by_role    — substring role classification counts distinct postings correctly.
+  * demand_by_role    — single-label role classification counts distinct postings correctly.
   * role_opportunity  — the decision mart's demand/remote/top-company columns are right.
 
 Rows are tuples in ``conftest.BRONZE_COLUMNS`` order, built via the ``bronze`` fixture.
@@ -43,9 +43,48 @@ def test_demand_by_role_counts(spark, fact):
     roles = s2g.make_roles_df(spark)
     demand = {r["role"]: r["job_count"] for r in s2g.build_demand_by_role(fact, roles, SNAPSHOT).collect()}
     assert demand["Data Engineer"] == 3            # "Senior Data Engineer" + two "Data Engineer"
-    assert demand["Machine Learning Engineer"] == 1
-    assert demand["DevOps Engineer"] == 1          # deduped across the two boards
+    assert demand["ML / AI Engineer"] == 1
+    assert demand["DevOps / SRE / Platform"] == 1  # deduped across the two boards
     assert "Backend Engineer" not in demand        # no matching titles -> absent
+
+
+def test_role_patterns_match_whole_words_only(spark, bronze):
+    # Substring matching put "html engineer" under ML ("ml engineer") and "platform engineering"
+    # under DevOps ("platform engineer"); patterns must match whole words of the title.
+    rows = [
+        ("greenhouse", "x", "11", "X", "Senior HTML Engineer", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "g"),
+        ("greenhouse", "x", "12", "X", "Customer Success Rep - Platform Engineering", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "h"),
+        ("greenhouse", "x", "13", "X", "ML Engineer, Search", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "i"),
+        ("greenhouse", "x", "14", "X", "Site Reliability Engineer (SRE)", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "j"),
+        ("greenhouse", "x", "15", "X", "Senior Front-End Engineer", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "k"),
+    ]
+    fact = s2g.build_fact(b2s.build_silver(bronze(rows), SNAPSHOT))
+    roles = s2g.make_roles_df(spark)
+    demand = {r["role"]: r["job_count"] for r in s2g.build_demand_by_role(fact, roles, SNAPSHOT).collect()}
+    assert demand == {
+        "ML / AI Engineer": 1,            # only "ML Engineer, Search", not "HTML Engineer"
+        "DevOps / SRE / Platform": 1,     # SRE title counted once; "Platform Engineering" excluded
+        "Frontend Engineer": 1,           # hyphenated pattern still matches
+    }
+
+
+def test_each_posting_gets_one_role_by_priority(spark, bronze):
+    rows = [
+        ("greenhouse", "y", "21", "Y", "Data Engineer / Backend Developer", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "l"),
+        ("greenhouse", "y", "22", "Y", "Software Engineer, Data Platform", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "m"),
+        ("greenhouse", "y", "23", "Y", "Machine Learning Engineering Manager", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "n"),
+        ("greenhouse", "y", "24", "Y", "Sr. Product Manager, Data Engineering", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "o"),
+        ("greenhouse", "y", "25", "Y", "Software Engineer, Banking", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "p"),
+    ]
+    fact = s2g.build_fact(b2s.build_silver(bronze(rows), SNAPSHOT))
+    roles = s2g.make_roles_df(spark)
+    demand = {r["role"]: r["job_count"] for r in s2g.build_demand_by_role(fact, roles, SNAPSHOT).collect()}
+    assert demand == {
+        "Data Engineer": 2,                 # first-listed family wins; qualifier form also counts
+        "Engineering Manager": 1,           # manager outranks the ML specialty
+        "Software Engineer (General)": 1,
+    }                                       # product manager excluded -> 4 of 5 classified
+    assert sum(demand.values()) == 4        # single label: role counts add up to postings
 
 
 def test_role_opportunity_decision_columns(spark, fact):

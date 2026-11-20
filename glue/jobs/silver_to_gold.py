@@ -7,7 +7,7 @@ Reads typed Silver Parquet for one ``snapshot_date`` and writes three Gold marts
     measure. Mirrors SkillRadar's ``fact_job_posting`` dbt model.
   * ``gold/demand_by_role/``   — per target role, the count of DISTINCT deduped postings whose
     title matches the role's patterns, for this snapshot. Mirrors ``int_posting_roles`` +
-    role-level demand (substring match on the lower-cased title, a posting may match many roles).
+    role-level demand (first matching role family by priority, one role per posting).
   * ``gold/role_opportunity/`` — the DECISION mart: per role, demand rank + remote share + the
     single top-hiring company, so the question "which role should I learn / apply for?" has one
     table to answer it. Enriches ``demand_by_role`` with the columns a candidate actually decides on.
@@ -32,19 +32,78 @@ from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
 from pipeline_contract import read_json, silver_path, validate_manifest
 
-# Target role families and the lower-cased title substrings that classify a posting into each.
-# Port of SkillRadar domain/roles.py DEFAULT_ROLES (== transform/seeds/seed_roles.csv).
-DEFAULT_ROLES = [
-    ("Backend Engineer", ["backend engineer", "back-end engineer", "backend developer", "backend software engineer"]),
-    ("Frontend Engineer", ["frontend engineer", "front-end engineer", "frontend developer", "ui engineer"]),
-    ("Full Stack Engineer", ["full stack", "fullstack", "full-stack engineer"]),
-    ("Data Engineer", ["data engineer", "etl engineer", "analytics engineer"]),
-    ("Data Scientist", ["data scientist", "machine learning scientist"]),
-    ("Machine Learning Engineer", ["machine learning engineer", "ml engineer", "ai engineer"]),
-    ("DevOps Engineer", ["devops", "site reliability", "sre", "platform engineer", "infrastructure engineer"]),
-    ("Mobile Engineer", ["mobile engineer", "ios engineer", "android engineer", "mobile developer"]),
+# Role taxonomy: each posting gets AT MOST ONE role family, the first one (top to bottom) with a
+# regex matching its lower-cased title; titles matching ROLE_EXCLUDE get none. Families are ordered
+# specific -> general, and a family may appear twice: the first entry matches the role written as
+# the job ("Backend Engineer"), the later one the role written as a qualifier
+# ("Software Engineer, Data Platform"). Regexes are valid in both Python re and Java (Spark rlike).
+# Calibrated on 8,103 live postings from the 36 configured boards (2026-11-20).
+# dashboard/model.py keeps an identical copy (enforced by tests/test_dashboard.py).
+ROLE_EXCLUDE = [
+    r"\b(?:product|program|project|technical program|account|marketing|partner|delivery) manager\b",
+    r"\b(?:recruit\w*|sourcer|assistant|counsel|account executive|account director|account manager)\b",
+    r"\b(?:market|ux|user|product|qualitative|design|experience) researcher\b",
 ]
-ROLE_PATTERNS = [(role, pattern) for role, patterns in DEFAULT_ROLES for pattern in patterns]
+DEFAULT_ROLES = [
+    ("Forward Deployed / Solutions", [
+        r"\bforward[\- ]deployed\b", r"\bfde\b", r"\bdeployment strategist\b",
+        r"\bsolutions? (?:engineer\w*|architect|consultant)\b",
+        r"\b(?:sales|presales|pre-sales|customer|field|partner|value) engineer\w*\b",
+        r"\bimplementation (?:engineer|consultant)\b", r"\bdeveloper (?:advocate|relations)\b",
+    ]),
+    ("Engineering Manager", [
+        r"\bengineering manager\b", r"\bmanager,? (?:of )?(?:software )?engineering\b",
+        r"\b(?:head|director|vp) of engineering\b",
+    ]),
+    ("Research Scientist / Engineer", [r"\bresearch (?:engineer|scientist)\b", r"\bresearcher\b"]),
+    ("ML / AI Engineer", [
+        r"\bmachine learning (?:engineer|systems engineer)\b", r"\bml (?:engineer|ops)\b", r"\bmlops\b",
+        r"\b(?:applied )?ai (?:engineer|software engineer)\b", r"\bllm engineer\b",
+    ]),
+    ("Data Scientist", [r"\bdata scien(?:tist|ce)\b", r"\b(?:machine learning|applied) scientist\b"]),
+    ("Data Engineer", [r"\bdata engineer(?:ing)?\b", r"\betl (?:engineer|developer)\b", r"\banalytics engineer\b"]),
+    ("Data Analyst / BI", [
+        r"\bdata analyst\b", r"\b(?:business intelligence|bi) (?:analyst|engineer|developer)\b", r"\bproduct analyst\b",
+    ]),
+    ("Security Engineer", [
+        r"\bsecurity (?:engineer|software engineer|operations engineer|systems engineer)\b",
+        r"\b(?:application|product|cloud|infrastructure|offensive) security engineer\b",
+        r"\bdetection (?:and response )?engineer\b",
+    ]),
+    ("DevOps / SRE / Platform", [
+        r"\bdevops\b", r"\bsite reliability\b", r"\bsre\b",
+        r"\b(?:platform|infrastructure|cloud|kubernetes|production) engineer\b",
+    ]),
+    ("Mobile Engineer", [r"\b(?:mobile|ios|android)\b"]),
+    ("Full Stack Engineer", [r"\bfull[\- ]?stack\b"]),
+    ("Frontend Engineer", [r"\bfront[\- ]?end\b", r"\bui engineer\b", r"\bweb (?:engineer|developer)\b"]),
+    ("Backend Engineer", [
+        r"\bback[\- ]?end\b", r"\bapi engineer\b", r"\bdistributed systems\b",
+        r"\b(?:java|golang|go|python|scala|rust|c\+\+) (?:software )?(?:engineer|developer)\b",
+        r"\.net (?:software )?(?:engineer|developer)\b",
+    ]),
+    # Second pass: the specialisation written as a qualifier of a generic engineering title.
+    ("Data Engineer", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",
+    ]),
+    ("ML / AI Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b"]),
+    ("Security Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\bsecurity\b"]),
+    ("DevOps / SRE / Platform", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",
+    ]),
+    ("Technical Support Engineer", [r"\bsupport engineer\b", r"\btechnical (?:support|services) engineer\b"]),
+    ("Software Engineer (General)", [
+        r"\bsoftware (?:engineer|developer|engineering)\b", r"\bsoftwareentwickler\b",
+        r"\bmember of technical staff\b", r"\bfounding engineer\b", r"^(?:senior |staff |principal |lead )?engineer\b",
+    ]),
+]
+# (priority, role, regex): lower priority wins; exclusions come first with role = NULL.
+ROLE_PATTERNS = [(0, None, regex) for regex in ROLE_EXCLUDE] + [
+    (priority, role, regex)
+    for priority, (role, regexes) in enumerate(DEFAULT_ROLES, start=1)
+    for regex in regexes
+]
+ROLE_FAMILIES = list(dict.fromkeys(role for role, _ in DEFAULT_ROLES))
 
 
 def optional_arg(name: str, default: str) -> str:
@@ -57,8 +116,8 @@ def optional_arg(name: str, default: str) -> str:
 
 
 def make_roles_df(spark: SparkSession) -> DataFrame:
-    """The (role, pattern) lookup as a small DataFrame, broadcast-joined to postings."""
-    return spark.createDataFrame(ROLE_PATTERNS, schema=["role", "pattern"])
+    """The (priority, role, regex) lookup as a small DataFrame, broadcast-joined to postings."""
+    return spark.createDataFrame(ROLE_PATTERNS, schema="priority int, role string, regex string")
 
 
 def build_fact(silver: DataFrame) -> DataFrame:
@@ -84,16 +143,19 @@ def build_fact(silver: DataFrame) -> DataFrame:
 
 
 def _role_bridge(fact: DataFrame, roles_df: DataFrame) -> DataFrame:
-    """One row per (job_id, role) — a posting whose lower-cased title contains a role pattern.
+    """One row per classified posting: (job_id, role) for its highest-priority matching family.
 
-    Carries is_remote + company so downstream marts can measure them. distinct() collapses the
-    duplicate rows a posting gets when its title contains several patterns for the same role.
+    A title matching an exclusion (priority 0, role NULL) or no regex at all gets no row. Carries
+    is_remote + company so downstream marts can measure them. Each posting counts in one role only,
+    so role counts sum to the number of classified postings.
     """
+    first_match = Window.partitionBy("job_id").orderBy("priority")
     return (
         fact.select("job_id", "title_lower", "is_remote", "company")
-        .join(F.broadcast(roles_df), F.col("title_lower").contains(F.col("pattern")))
+        .join(F.broadcast(roles_df), F.expr("title_lower rlike regex"))
+        .withColumn("_rn", F.row_number().over(first_match))
+        .where((F.col("_rn") == 1) & F.col("role").isNotNull())
         .select("job_id", "role", "is_remote", "company")
-        .distinct()
     )
 
 

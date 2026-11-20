@@ -1,22 +1,79 @@
 """Display semantics; title rules intentionally match the Gold transform."""
+import re
 from urllib.parse import urlparse
 
-DEFAULT_ROLES = [('Backend Engineer',
-  ['backend engineer', 'back-end engineer', 'backend developer', 'backend software engineer']),
- ('Frontend Engineer',
-  ['frontend engineer', 'front-end engineer', 'frontend developer', 'ui engineer']),
- ('Full Stack Engineer', ['full stack', 'fullstack', 'full-stack engineer']),
- ('Data Engineer', ['data engineer', 'etl engineer', 'analytics engineer']),
- ('Data Scientist', ['data scientist', 'machine learning scientist']),
- ('Machine Learning Engineer', ['machine learning engineer', 'ml engineer', 'ai engineer']),
- ('DevOps Engineer',
-  ['devops', 'site reliability', 'sre', 'platform engineer', 'infrastructure engineer']),
- ('Mobile Engineer', ['mobile engineer', 'ios engineer', 'android engineer', 'mobile developer'])]
+# Identical copy of the Gold taxonomy in glue/jobs/silver_to_gold.py (tests enforce equality).
+ROLE_EXCLUDE = [
+    r"\b(?:product|program|project|technical program|account|marketing|partner|delivery) manager\b",
+    r"\b(?:recruit\w*|sourcer|assistant|counsel|account executive|account director|account manager)\b",
+    r"\b(?:market|ux|user|product|qualitative|design|experience) researcher\b",
+]
+DEFAULT_ROLES = [
+    ("Forward Deployed / Solutions", [
+        r"\bforward[\- ]deployed\b", r"\bfde\b", r"\bdeployment strategist\b",
+        r"\bsolutions? (?:engineer\w*|architect|consultant)\b",
+        r"\b(?:sales|presales|pre-sales|customer|field|partner|value) engineer\w*\b",
+        r"\bimplementation (?:engineer|consultant)\b", r"\bdeveloper (?:advocate|relations)\b",
+    ]),
+    ("Engineering Manager", [
+        r"\bengineering manager\b", r"\bmanager,? (?:of )?(?:software )?engineering\b",
+        r"\b(?:head|director|vp) of engineering\b",
+    ]),
+    ("Research Scientist / Engineer", [r"\bresearch (?:engineer|scientist)\b", r"\bresearcher\b"]),
+    ("ML / AI Engineer", [
+        r"\bmachine learning (?:engineer|systems engineer)\b", r"\bml (?:engineer|ops)\b", r"\bmlops\b",
+        r"\b(?:applied )?ai (?:engineer|software engineer)\b", r"\bllm engineer\b",
+    ]),
+    ("Data Scientist", [r"\bdata scien(?:tist|ce)\b", r"\b(?:machine learning|applied) scientist\b"]),
+    ("Data Engineer", [r"\bdata engineer(?:ing)?\b", r"\betl (?:engineer|developer)\b", r"\banalytics engineer\b"]),
+    ("Data Analyst / BI", [
+        r"\bdata analyst\b", r"\b(?:business intelligence|bi) (?:analyst|engineer|developer)\b", r"\bproduct analyst\b",
+    ]),
+    ("Security Engineer", [
+        r"\bsecurity (?:engineer|software engineer|operations engineer|systems engineer)\b",
+        r"\b(?:application|product|cloud|infrastructure|offensive) security engineer\b",
+        r"\bdetection (?:and response )?engineer\b",
+    ]),
+    ("DevOps / SRE / Platform", [
+        r"\bdevops\b", r"\bsite reliability\b", r"\bsre\b",
+        r"\b(?:platform|infrastructure|cloud|kubernetes|production) engineer\b",
+    ]),
+    ("Mobile Engineer", [r"\b(?:mobile|ios|android)\b"]),
+    ("Full Stack Engineer", [r"\bfull[\- ]?stack\b"]),
+    ("Frontend Engineer", [r"\bfront[\- ]?end\b", r"\bui engineer\b", r"\bweb (?:engineer|developer)\b"]),
+    ("Backend Engineer", [
+        r"\bback[\- ]?end\b", r"\bapi engineer\b", r"\bdistributed systems\b",
+        r"\b(?:java|golang|go|python|scala|rust|c\+\+) (?:software )?(?:engineer|developer)\b",
+        r"\.net (?:software )?(?:engineer|developer)\b",
+    ]),
+    # Second pass: the specialisation written as a qualifier of a generic engineering title.
+    ("Data Engineer", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",
+    ]),
+    ("ML / AI Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b"]),
+    ("Security Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\bsecurity\b"]),
+    ("DevOps / SRE / Platform", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",
+    ]),
+    ("Technical Support Engineer", [r"\bsupport engineer\b", r"\btechnical (?:support|services) engineer\b"]),
+    ("Software Engineer (General)", [
+        r"\bsoftware (?:engineer|developer|engineering)\b", r"\bsoftwareentwickler\b",
+        r"\bmember of technical staff\b", r"\bfounding engineer\b", r"^(?:senior |staff |principal |lead )?engineer\b",
+    ]),
+]
+ROLE_FAMILIES = list(dict.fromkeys(role for role, _ in DEFAULT_ROLES))
+_EXCLUDE = [re.compile(regex) for regex in ROLE_EXCLUDE]
+_ROLE_REGEXES = [(role, [re.compile(regex) for regex in regexes]) for role, regexes in DEFAULT_ROLES]
 
 
 def classify(title):
+    """[role] for the first matching family by priority, or ["Unclassified"] (same rule as Gold)."""
     title = (title or "").lower()
-    return [role for role, patterns in DEFAULT_ROLES if any(p in title for p in patterns)] or ["Unclassified"]
+    if not any(regex.search(title) for regex in _EXCLUDE):
+        for role, regexes in _ROLE_REGEXES:
+            if any(regex.search(title) for regex in regexes):
+                return [role]
+    return ["Unclassified"]
 
 
 def safe_link(value):
