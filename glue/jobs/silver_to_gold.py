@@ -121,8 +121,15 @@ def make_roles_df(spark: SparkSession) -> DataFrame:
 
 
 def build_fact(silver: DataFrame) -> DataFrame:
-    """fact_job_posting: keep one representative per content hash (cross-source dedup) + enrich."""
-    keep = Window.partitionBy("dedup_hash").orderBy("job_id")
+    """fact_job_posting: keep one representative per content hash (cross-source dedup) + enrich.
+
+    Representative = the copy observed most recently (a board that failed today keeps an older
+    last_seen_at), then the one that reports posted_at, then the lowest job_id so reruns are
+    deterministic. Same precedence as the per-job_id dedup in bronze_to_silver.build_silver.
+    """
+    keep = Window.partitionBy("dedup_hash").orderBy(
+        F.col("last_seen_at").desc(), F.col("posted_at").desc_nulls_last(), F.col("job_id"),
+    )
     return (
         silver.where(F.col("is_active") & F.col("is_fresh"))
         .withColumn("_rn", F.row_number().over(keep))

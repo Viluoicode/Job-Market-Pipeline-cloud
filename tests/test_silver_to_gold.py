@@ -1,14 +1,18 @@
 """Unit tests for the Silver -> Gold transforms (glue/jobs/silver_to_gold.py).
 
 Builds a tiny Silver frame via ``build_silver`` (so the fixtures are realistic), then asserts:
-  * fact_job_posting  — cross-source content dedup keeps one row per dedup_hash.
+  * fact_job_posting  — cross-source content dedup keeps one row per dedup_hash, choosing the
+                        most recently observed copy (then the one with posted_at) deliberately.
   * demand_by_role    — single-label role classification counts distinct postings correctly.
   * role_opportunity  — the decision mart's demand/remote/top-company columns are right.
 
 Rows are tuples in ``conftest.BRONZE_COLUMNS`` order, built via the ``bronze`` fixture.
 """
 
+import hashlib
+
 import pytest
+from pyspark.sql import functions as F
 
 import bronze_to_silver as b2s
 import silver_to_gold as s2g
@@ -37,6 +41,47 @@ def fact(bronze):
 def test_build_fact_dedups_cross_source(fact):
     # 6 raw rows, but the DevOps posting on two boards collapses -> 5 unique content rows.
     assert fact.count() == 5
+
+
+def _same_content_pair(bronze, posted_at_a, posted_at_b):
+    """Two copies of one posting (same company/title/location -> same dedup_hash) on two boards.
+
+    Returns (silver, lower_id, higher_id) where lower_id is the job_id the old orderBy("job_id")
+    rule would keep, so each test can make that copy the WRONG one to keep.
+    """
+    rows = [
+        ("greenhouse", "boarda", "101", "Acme", "Data Engineer", "Berlin", False, "u", posted_at_a, "x"),
+        ("lever", "boardb", "202", "Acme", "Data Engineer", "Berlin", False, "u", posted_at_b, "y"),
+    ]
+    silver = b2s.build_silver(bronze(rows), SNAPSHOT)
+    ids = sorted(hashlib.sha256(f"{src}|{board}|{sid}".encode()).hexdigest() for src, board, sid, *_ in rows)
+    assert silver.select("dedup_hash").distinct().count() == 1      # precondition: true duplicates
+    return silver, ids[0], ids[1]
+
+
+def test_build_fact_keeps_most_recently_seen_duplicate(bronze):
+    silver, lower_id, higher_id = _same_content_pair(
+        bronze, "2026-01-01T00:00:00+00:00", "2026-01-01T00:00:00+00:00")
+    # The lower job_id copy was last observed a day earlier (e.g. its board failed today).
+    silver = silver.withColumn(
+        "last_seen_at",
+        F.when(F.col("job_id") == lower_id, F.to_timestamp(F.lit("2025-12-31 00:00:00")))
+         .otherwise(F.to_timestamp(F.lit("2026-01-01 00:00:00"))),
+    )
+    kept = s2g.build_fact(silver).collect()
+    assert [r["job_id"] for r in kept] == [higher_id]
+
+
+def test_build_fact_prefers_duplicate_with_posted_at(bronze):
+    # Same last_seen_at; only the higher job_id copy reports posted_at.
+    silver, lower_id, higher_id = _same_content_pair(bronze, None, None)
+    silver = silver.withColumn(
+        "posted_at",
+        F.when(F.col("job_id") == higher_id, F.to_timestamp(F.lit("2025-12-20 00:00:00"))),
+    )
+    kept = s2g.build_fact(silver).collect()
+    assert [r["job_id"] for r in kept] == [higher_id]
+    assert kept[0]["posted_at"] is not None
 
 
 def test_demand_by_role_counts(spark, fact):

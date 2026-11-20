@@ -15,7 +15,7 @@
 | Field | Meaning / Ý nghĩa |
 | --- | --- |
 | `job_id` | Hash of source, board and original ID; source identity, not universal vacancy ID |
-| `dedup_hash` | Content-based duplicate grouping; may merge similar postings or miss edited duplicates |
+| `dedup_hash` | Content-based duplicate grouping; may merge similar postings or miss edited duplicates. Gold keeps the most recently seen copy (then one with `posted_at`) |
 | `source` / `board_token` | API platform / configured company board or aggregator |
 | `company`, `title`, `location` | Source-reported values; locations are not standardized cities |
 | `apply_url` | Original external job link; availability must be checked there |
