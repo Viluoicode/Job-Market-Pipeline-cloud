@@ -1,7 +1,7 @@
 name: terraform
 
-# Lint + validate the IaC on every push/PR. fmt + validate need no AWS credentials, so CI stays
-# green for free. `plan` (which needs credentials) is an optional manual run — wire up OIDC and
+# Lint, validate and security-scan (Checkov) the IaC on every push/PR. None of it needs AWS
+# credentials, so CI stays green for free. `plan` (which needs credentials) is an optional manual run — wire up OIDC and
 # uncomment the job below if you want it.
 on:
   push:
@@ -34,6 +34,21 @@ jobs:
 
       - name: terraform validate
         run: terraform validate
+
+  checkov:
+    name: checkov (IaC security scan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # Every finding is fixed or suppressed inline with `#checkov:skip=<id>:<reason>`; the reasons
+      # are listed in docs/security-review.md. A new unreviewed finding fails the build.
+      - uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          framework: terraform
+          quiet: true
+          soft_fail: false
 
   # plan:
   #   name: plan (needs AWS creds via OIDC)
