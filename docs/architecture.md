@@ -235,7 +235,7 @@ reviewed before setting one. Nonempty bucket destruction is opt-in via allow_buc
 | Spark jobs, database, and crawler | `infra/glue.tf` |
 | Script uploads and shared contract | `infra/scripts_upload.tf` |
 | Orchestration and completion marker | `infra/stepfunctions.tf` |
-| Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf.json`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf` |
+| Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf` |
 | Daily schedule | `infra/schedule.tf` |
 | Monitoring and notification | `infra/monitoring.tf` |
 | Athena and saved queries | `infra/athena.tf` |
