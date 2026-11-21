@@ -21,7 +21,6 @@
     { "source": "Greenhouse", "token": "elastic", "company": "Elastic" },
     { "source": "Greenhouse", "token": "twilio", "company": "Twilio" },
     { "source": "Lever", "token": "spotify", "company": "Spotify" },
-    { "source": "Lever", "token": "mistral", "company": "Mistral AI" },
     { "source": "Lever", "token": "palantir", "company": "Palantir" },
     { "source": "Lever", "token": "matchgroup", "company": "Match Group" },
     { "source": "Lever", "token": "kavak", "company": "Kavak" },
@@ -35,6 +34,7 @@
     { "source": "Ashby", "token": "cohere", "company": "Cohere" },
     { "source": "Ashby", "token": "supabase", "company": "Supabase" },
     { "source": "Ashby", "token": "zapier", "company": "Zapier" },
+    { "source": "Ashby", "token": "mistral.ai", "company": "Mistral AI" },
     { "source": "Arbeitnow", "token": "arbeitnow", "company": "Arbeitnow (aggregator)" }
   ]
 }
