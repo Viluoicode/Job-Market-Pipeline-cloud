@@ -1,0 +1,3 @@
+# Copy to infra/backend.hcl (git-ignored) and set the state bucket created in docs/operations.md.
+# Naming convention: <project>-tfstate-<account-id>-<region>
+bucket = "jobmarket-aws-tfstate-123456789012-ap-southeast-1"

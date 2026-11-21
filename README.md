@@ -124,8 +124,9 @@ Open **http://localhost:8501** and press **Refresh data**. Keep the terminal run
 stops only the dashboard. Repeat the environment-variable block after opening a new terminal.
 No Java/Spark installation is needed just to view the dashboard.
 
-These `terraform output` commands read the existing deployment state; they do not deploy anything.
-A fresh clone does not include private state or AWS credentials. If outputs are unavailable, obtain
+These `terraform output` commands read the existing deployment state from S3; they do not deploy anything.
+On a new machine run `terraform -chdir=infra init -backend-config=backend.hcl` once first
+(see [remote state](docs/operations.md#remote-state--state-trên-s3-one-time)). A fresh clone has no AWS credentials. If outputs are unavailable, obtain
 these six settings from the existing deployment's operator; do not create another stack just to view it.
 If reusing a different venv, substitute its Python executable consistently in both commands.
 

@@ -24,7 +24,7 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.9.8"
+          terraform_version: "1.15.7"
 
       - name: terraform fmt
         run: terraform fmt -check -recursive
@@ -52,6 +52,6 @@ jobs:
   #         aws-region: ap-southeast-1
   #     - uses: hashicorp/setup-terraform@v3
   #       with:
-  #         terraform_version: "1.9.8"
+  #         terraform_version: "1.15.7"
   #     - run: terraform init
   #     - run: terraform plan -input=false
