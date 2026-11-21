@@ -1,8 +1,9 @@
 # ============================================================================================
-# IAM — one role for Glue (jobs + crawler), one for the Step Functions state machine.
+# IAM — shared Glue trust policy and the Step Functions role. Per-stage runtime roles (Silver,
+# Gold, crawler, dashboard reader) live in iam_runtime.tf.
 # ============================================================================================
 
-# ---- Glue role -----------------------------------------------------------------------------
+# ---- Glue trust policy (shared by the stage roles in iam_runtime.tf) --------------------------
 data "aws_iam_policy_document" "glue_assume" {
   statement {
     actions = ["sts:AssumeRole"]

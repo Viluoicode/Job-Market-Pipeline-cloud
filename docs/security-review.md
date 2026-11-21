@@ -41,7 +41,7 @@ The reader trust lists explicitly configured IAM principals, not account-root or
 The operator's AdministratorAccess was not removed; bootstrap credentials remain available to the
 local operator. This is not OS/process isolation or an authorization design for public hosting.
 
-Implementation: `infra/iam_runtime.tf.json`, `infra/iam.tf`, `infra/glue.tf`, `infra/s3.tf`,
+Implementation: `infra/iam_runtime.tf`, `infra/iam.tf`, `infra/glue.tf`, `infra/s3.tf`,
 `dashboard/data_access.py`, `dashboard/app.py`. Configure trusted principals using the ignored
 `infra/terraform.tfvars`; see the example file. New deployments with an empty principal list do not
 create a reader role and cannot launch the dashboard until configured.
