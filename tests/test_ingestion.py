@@ -1,6 +1,8 @@
 """Exercise API failures, completeness and the manifest commit boundary without AWS."""
 import json
+import re
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 import land_to_bronze as ingest
@@ -199,3 +201,38 @@ def test_arbeitnow_remote_flag_or_unknown(flag, expected):
         job["remote"] = flag
     payload = {"data": [job], "links": {"next": None}}
     assert _fetch(ingest.fetch_arbeitnow, payload)[0]["remote"] is expected
+
+
+CATALOG = Path(ingest.__file__).with_name("sources.json")
+
+
+def test_source_catalog_is_well_formed():
+    boards = json.loads(CATALOG.read_text(encoding="utf-8"))["boards"]
+    identities = [(b["source"].lower(), b["token"]) for b in boards]
+    assert all(source in ingest.CONNECTORS for source, _ in identities)
+    # URL path segment and S3 key component: keep tokens to unreserved characters.
+    assert all(re.fullmatch(r"[A-Za-z0-9._-]{1,80}", token) for _, token in identities)
+    assert len(set(identities)) == len(identities)
+    # A company that moves ATS must be replaced, not added twice (its postings would double count).
+    companies = [b["company"] for b in boards]
+    assert len(set(companies)) == len(companies)
+
+
+def test_ashby_board_token_with_dot_round_trips(tmp_path):
+    # Mistral AI's Ashby board is "mistral.ai": the dot must survive the URL, the Bronze key
+    # and manifest validation unchanged.
+    requested = []
+
+    def handler(req):
+        requested.append(req.url.path)
+        return httpx.Response(200, json={"jobs": [
+            {"id": "a1", "title": "ML Engineer", "location": "Paris", "workplaceType": "Hybrid"}]})
+
+    manifest = run(tmp_path, [{"source": "Ashby", "token": "mistral.ai", "company": "Mistral AI"}], handler)
+    assert requested == ["/posting-api/job-board/mistral.ai"]
+    keys, complete = validate_manifest(manifest, "test-run", manifest["snapshot_date"])
+    assert keys == ["bronze/run_id=test-run/source=ashby/board=mistral.ai/jobs.json"]
+    assert complete == [("ashby", "mistral.ai")]
+    record = json.loads((tmp_path / keys[0]).read_text())
+    assert record["board_token"] == "mistral.ai" and record["company"] == "Mistral AI"
+    assert record["remote"] is False          # Hybrid is not remote
