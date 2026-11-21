@@ -26,6 +26,7 @@ data "archive_file" "health_monitor" {
 }
 
 resource "aws_sns_topic" "pipeline_alerts" {
+  #checkov:skip=CKV_AWS_26:CloudWatch alarms cannot publish to a topic encrypted with aws/sns; a customer key would add cost for non-sensitive alert text
   name = "${var.project}-pipeline-alerts"
 }
 
@@ -70,6 +71,8 @@ resource "aws_sns_topic_subscription" "monitor_email" {
 }
 
 resource "aws_cloudwatch_log_group" "health_monitor" {
+  #checkov:skip=CKV_AWS_158:logs hold no secrets; CloudWatch encrypts log data at rest by default
+  #checkov:skip=CKV_AWS_338:14-day retention bounds cost; durable evidence lives in S3 manifests and state
   name              = "/aws/lambda/${var.project}-health-monitor"
   retention_in_days = 14
 }
@@ -121,6 +124,12 @@ resource "aws_iam_role_policy" "health_monitor" {
 }
 
 resource "aws_lambda_function" "health_monitor" {
+  #checkov:skip=CKV_AWS_115:no reserved concurrency: small accounts cannot reserve any; overlapping runs are safe
+  #checkov:skip=CKV_AWS_116:scheduled async invoke; failure is alarmed and the next 15-minute run retries
+  #checkov:skip=CKV_AWS_117:calls only AWS public APIs; a VPC would need NAT/endpoints for no isolation gain
+  #checkov:skip=CKV_AWS_173:env vars hold resource names only, no secrets; Lambda encrypts them at rest by default
+  #checkov:skip=CKV_AWS_272:single-operator Terraform deployment from reviewed source; no code-signing profile
+  #checkov:skip=CKV_AWS_50:short single-call function; CloudWatch logs and alarms are sufficient, no X-Ray
   function_name    = "${var.project}-health-monitor"
   role             = aws_iam_role.health_monitor.arn
   runtime          = "python3.12"

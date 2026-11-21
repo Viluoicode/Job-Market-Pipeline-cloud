@@ -78,6 +78,44 @@ The command requires an operator with IAM simulation/configuration-read permissi
 reader is intentionally not allowed to audit IAM. Gold still lacks an atomic transaction across its
 three marts; publication checks and the lock reduce exposure but do not add storage transactions.
 
+## IaC scan (Checkov) / Quét bảo mật hạ tầng — 2026-11-21
+
+CI runs Checkov 3.4.6 (`bridgecrewio/checkov-action@v12`) on `infra/` with `soft_fail: false`.
+The first scan reported 41 findings across 20 checks (279 passed). Every finding was reviewed: one
+check was fixed, the rest are suppressed inline (`#checkov:skip=<id>:<reason>`) on the exact
+resource. Result: 282 passed, 0 failed, 38 skipped. A new finding fails the pull request until it is
+fixed or a reasoned suppression is reviewed.
+
+**Fixed**
+
+| Check | Change |
+| --- | --- |
+| CKV_AWS_300 abort failed multipart uploads | Bucket-wide lifecycle rule on all three buckets aborts incomplete uploads after 7 days. An interrupted Spark write otherwise leaves billed parts that never appear as objects. |
+
+**Accepted with reasons** (the workshop stores public job postings; most items are enterprise
+defaults whose cost or operating burden is not justified at this scale)
+
+| Check | Resources | Reason |
+| --- | --- | --- |
+| CKV_AWS_145 S3 KMS, CKV_AWS_119 DynamoDB CMK, CKV_AWS_158 log group KMS, CKV_AWS_173 Lambda env KMS | buckets, lock table, Lambda logs/env | Data is encrypted at rest with AWS-owned/managed keys (SSE-S3 enforced). A customer KMS key costs per key and per request and protects no secret here. |
+| CKV_AWS_26 SNS encryption | alert topic | CloudWatch alarms cannot publish to a topic encrypted with the AWS-managed `aws/sns` key (its key policy cannot grant CloudWatch). A customer key would add cost for non-sensitive alert text. |
+| CKV_AWS_144 cross-region replication | buckets | Single-region workshop; versioning covers accidental overwrite/delete. Replication doubles storage. |
+| CKV_AWS_18 S3 access logging | buckets | Needs a separate log bucket; CloudTrail already records management events. |
+| CKV2_AWS_62 S3 event notifications | buckets | Nothing consumes object events; Step Functions orchestrates the pipeline. |
+| CKV_AWS_21 versioning | Athena results bucket | Query output is reproducible and expires after 7 days; versioning would keep it. Lake and scripts buckets are versioned. |
+| CKV_AWS_195 Glue security configuration | three jobs, crawler | Buckets already enforce SSE-S3 and TLS; a configuration without KMS adds no protection. |
+| CKV_AWS_28 point-in-time recovery | lock table | It holds one transient lock item; restoring an old lock would be wrong. |
+| CKV_AWS_115 reserved concurrency | both Lambdas | Small accounts cannot reserve concurrency; overlapping runs are safe (conditional delete / idempotent metrics). |
+| CKV_AWS_116 dead-letter queue | both Lambdas | Scheduled asynchronous invocations; a failure raises an alarm and the next 15-minute run retries. |
+| CKV_AWS_117 VPC | both Lambdas | They call only AWS public APIs; a VPC would need NAT or endpoints without isolation gain. |
+| CKV_AWS_272 code signing | both Lambdas | Single-operator Terraform deployment from reviewed source. |
+| CKV_AWS_50, CKV_AWS_284 X-Ray tracing | Lambdas, state machine | Short service calls; execution history, logs and alarms are sufficient. |
+| CKV_AWS_285 execution logging | state machine | A Standard workflow keeps full execution history for 90 days; failures alarm through SNS. |
+| CKV_AWS_338 one-year log retention | Lambda log groups | 14 days bounds cost; durable evidence lives in S3 manifests and state files. |
+
+Revisit these decisions if the data becomes sensitive, the stack becomes multi-user, or an
+organization policy requires customer-managed keys.
+
 ---
 
 ## Historical findings before this deployment

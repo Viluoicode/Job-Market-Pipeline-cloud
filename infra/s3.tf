@@ -5,6 +5,10 @@
 
 # ---- Data lake -----------------------------------------------------------------------------
 resource "aws_s3_bucket" "lake" {
+  #checkov:skip=CKV_AWS_145:SSE-S3 (AES256) default encryption; a customer KMS key adds cost, no benefit for public job data
+  #checkov:skip=CKV_AWS_144:single-region workshop; versioning covers recovery, replication would double storage
+  #checkov:skip=CKV_AWS_18:no access-log bucket; CloudTrail covers management events at this scale
+  #checkov:skip=CKV2_AWS_62:no consumer for object events; Step Functions orchestrates the pipeline
   bucket        = local.lake_bucket
   force_destroy = var.allow_bucket_force_destroy
 }
@@ -58,10 +62,25 @@ resource "aws_s3_bucket_lifecycle_configuration" "lake" {
       days = 90
     }
   }
+  # Parts of a failed multipart upload (e.g. an interrupted Spark write) are billed but never
+  # listed as objects; clean them up bucket-wide.
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
 }
 
 # ---- Athena results ------------------------------------------------------------------------
 resource "aws_s3_bucket" "athena_results" {
+  #checkov:skip=CKV_AWS_145:SSE-S3 (AES256) default encryption; a customer KMS key adds cost, no benefit for public job data
+  #checkov:skip=CKV_AWS_144:single-region workshop; versioning covers recovery, replication would double storage
+  #checkov:skip=CKV_AWS_18:no access-log bucket; CloudTrail covers management events at this scale
+  #checkov:skip=CKV2_AWS_62:no consumer for object events; Step Functions orchestrates the pipeline
+  #checkov:skip=CKV_AWS_21:query output is reproducible and expires after 7 days; versioning would retain it
   bucket        = local.athena_bucket
   force_destroy = var.allow_bucket_force_destroy
 }
@@ -95,10 +114,24 @@ resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
       days = var.athena_results_expiration_days
     }
   }
+  # Parts of a failed multipart upload (e.g. an interrupted Spark write) are billed but never
+  # listed as objects; clean them up bucket-wide.
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
 }
 
 # ---- Glue scripts + TempDir ----------------------------------------------------------------
 resource "aws_s3_bucket" "scripts" {
+  #checkov:skip=CKV_AWS_145:SSE-S3 (AES256) default encryption; a customer KMS key adds cost, no benefit for public job data
+  #checkov:skip=CKV_AWS_144:single-region workshop; versioning covers recovery, replication would double storage
+  #checkov:skip=CKV_AWS_18:no access-log bucket; CloudTrail covers management events at this scale
+  #checkov:skip=CKV2_AWS_62:no consumer for object events; Step Functions orchestrates the pipeline
   bucket        = local.scripts_bucket
   force_destroy = var.allow_bucket_force_destroy
 }
@@ -133,6 +166,16 @@ resource "aws_s3_bucket_lifecycle_configuration" "scripts" {
     }
     abort_incomplete_multipart_upload {
       days_after_initiation = 1
+    }
+  }
+  # Parts of a failed multipart upload (e.g. an interrupted Spark write) are billed but never
+  # listed as objects; clean them up bucket-wide.
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
     }
   }
 }

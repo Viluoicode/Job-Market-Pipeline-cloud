@@ -22,6 +22,7 @@ locals {
 }
 
 resource "aws_glue_job" "bronze_to_silver" {
+  #checkov:skip=CKV_AWS_195:buckets enforce SSE-S3 and TLS; a security configuration without KMS adds nothing
   name              = "${var.project}-bronze-to-silver"
   role_arn          = aws_iam_role.silver.arn
   glue_version      = var.glue_version
@@ -44,6 +45,7 @@ resource "aws_glue_job" "bronze_to_silver" {
 }
 
 resource "aws_glue_job" "silver_to_gold" {
+  #checkov:skip=CKV_AWS_195:buckets enforce SSE-S3 and TLS; a security configuration without KMS adds nothing
   name              = "${var.project}-silver-to-gold"
   role_arn          = aws_iam_role.gold.arn
   glue_version      = var.glue_version
@@ -68,6 +70,7 @@ resource "aws_glue_job" "silver_to_gold" {
 # Crawls s3://<lake>/gold/ and registers fact_job_posting + demand_by_role (one table per
 # top-level folder via TableLevelConfiguration = 3: <bucket>/gold/<table>/snapshot_date=.../).
 resource "aws_glue_crawler" "gold" {
+  #checkov:skip=CKV_AWS_195:buckets enforce SSE-S3 and TLS; a security configuration without KMS adds nothing
   depends_on    = [aws_iam_role_policy.crawler]
   name          = "${var.project}-gold-crawler"
   role          = aws_iam_role.crawler.arn

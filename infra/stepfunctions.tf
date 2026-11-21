@@ -131,6 +131,8 @@ locals {
 }
 
 resource "aws_sfn_state_machine" "pipeline" {
+  #checkov:skip=CKV_AWS_284:Glue/DynamoDB service integrations; X-Ray adds little over execution history
+  #checkov:skip=CKV_AWS_285:Standard workflow keeps full execution history 90 days; failures alarm via SNS
   name     = "${var.project}-pipeline"
   role_arn = aws_iam_role.sfn.arn
   type     = "STANDARD"

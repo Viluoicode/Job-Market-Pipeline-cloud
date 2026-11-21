@@ -1,6 +1,7 @@
 # Python Shell keeps ingestion inside the existing Glue/Step Functions stack.
 # Unlike Spark ETL, this job uses only 0.0625 DPU and has a 15-minute ceiling.
 resource "aws_glue_job" "ingestion" {
+  #checkov:skip=CKV_AWS_195:buckets enforce SSE-S3 and TLS; a security configuration without KMS adds nothing
   name         = "${var.project}-ingestion"
   role_arn     = aws_iam_role.ingestion.arn
   max_capacity = 0.0625
@@ -89,6 +90,8 @@ resource "aws_iam_role_policy" "ingestion" {
 }
 
 resource "aws_dynamodb_table" "pipeline_lock" {
+  #checkov:skip=CKV_AWS_28:holds one transient lock item; restoring a backup of it would be wrong
+  #checkov:skip=CKV_AWS_119:no sensitive data; DynamoDB encrypts at rest with an AWS-owned key
   name         = "${var.project}-pipeline-lock"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockId"
