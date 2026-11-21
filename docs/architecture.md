@@ -64,11 +64,15 @@ flowchart TD
     MONITOR --> METRICS[CloudWatch metrics and alarms]
     SFN -. execution metrics .-> METRICS
     METRICS --> SNS[SNS email notification]
+    SFN -. FAILED / TIMED_OUT / ABORTED event .-> JANITOR[Lambda lock janitor]
+    JANITOR_SCHEDULE[EventBridge every 15 minutes] --> JANITOR
+    JANITOR -. conditional release .-> LOCK
 ```
 
 Solid arrows primarily show data/metadata movement; dashed arrows label control or metric paths.
 Step Functions conditionally releases its DynamoDB lock after publication or caught failure;
-abort/timeout recovery requires the [runbook](operations.md).
+after an abort/timeout the lock janitor releases it once Glue and the crawler are idle
+([runbook](operations.md)).
 
 The state machine is the only authorized production write path. A run identifier and the UTC date
 of the execution are fixed at workflow start and passed to every stage.
@@ -87,6 +91,7 @@ of the execution are fixed at workflow start and passed to every stage.
 | Glue Crawler and Catalog | Register the current Gold schema and partitions |
 | Athena | Provide serverless SQL access with a per-query scan limit |
 | Lambda health monitor | Independently evaluate publication freshness and source coverage |
+| Lambda lock janitor | Release an orphaned writer lock only after its execution and all Glue work ended |
 | CloudWatch and SNS | Detect execution/health failures and notify an operator |
 | Terraform | Define infrastructure, policies, schedules, uploads, and cost controls |
 
@@ -172,7 +177,8 @@ source sample and must not be presented as the whole labor market.
 - Silver state advances only after validation, data quality, and Parquet output succeed.
 - The crawler is verified by status and start time, not merely by returning to `READY`.
 - The workflow has a 90-minute ceiling; Glue stages have independent timeouts.
-- Aborted or timed-out external jobs must be confirmed stopped before an orphaned lock is removed.
+- Aborted or timed-out external jobs must be confirmed stopped before an orphaned lock is removed;
+  the lock janitor automates this check and releases the lock conditionally on its owner.
 - The monitor is independent of the pipeline and treats a missing health signal as a failure.
 
 ## Security boundaries
@@ -183,10 +189,12 @@ source sample and must not be presented as the whole labor market.
   role or responsibility.
 - The health monitor can read control metadata, write its own logs, and publish project metrics;
   it cannot mutate the lake or start a pipeline execution.
+- The lock janitor can read execution/job-run/crawler status and delete only the pipeline lock
+  key; it cannot start or stop executions or Glue jobs.
 - Athena uses an enforced workgroup result location and a 10 GiB scan cutoff.
 
 Security controls are defined mainly in `infra/s3.tf`, `infra/iam.tf`, `infra/ingestion.tf`,
-`infra/schedule.tf`, `infra/monitoring.tf`, and `infra/athena.tf`.
+`infra/schedule.tf`, `infra/monitoring.tf`, `infra/lock_janitor.tf`, and `infra/athena.tf`.
 
 Silver, Gold and the crawler use separate custom IAM roles. Runtime roles cannot modify scripts;
 Step Functions alone among pipeline runtime roles writes the completion marker. The dashboard
@@ -218,7 +226,8 @@ reviewed before setting one. Nonempty bucket destruction is opt-in via allow_buc
 - **Step Functions instead of a scheduler-only chain:** the workflow needs ownership, waits,
   retries, crawl verification, and failure cleanup across AWS services.
 - **DynamoDB lock instead of a time-based lock:** a TTL could expire while an external Glue task
-  still writes, allowing corruption through concurrent runs.
+  still writes, allowing corruption through concurrent runs. The lock janitor releases by
+  evidence (owner ended, Glue/crawler idle), not by elapsed time.
 - **Daily schedule:** it balances freshness with Glue cost for this portfolio-scale source set.
 - **Athena instead of Redshift:** current SQL volume does not justify a dedicated warehouse.
 - **Step Functions instead of MWAA:** this AWS batch workflow does not currently justify
@@ -235,9 +244,10 @@ reviewed before setting one. Nonempty bucket destruction is opt-in via allow_buc
 | Spark jobs, database, and crawler | `infra/glue.tf` |
 | Script uploads and shared contract | `infra/scripts_upload.tf` |
 | Orchestration and completion marker | `infra/stepfunctions.tf` |
-| Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf` |
+| Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf`, `infra/lock_janitor.tf` |
 | Daily schedule | `infra/schedule.tf` |
 | Monitoring and notification | `infra/monitoring.tf` |
+| Orphaned-lock recovery | `infra/lock_janitor.tf` |
 | Athena and saved queries | `infra/athena.tf` |
 | Budget guardrail | `infra/budget.tf` |
 

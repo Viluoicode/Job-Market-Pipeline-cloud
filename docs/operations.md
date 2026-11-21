@@ -84,6 +84,7 @@ of deploying resources or starting a pipeline execution.
 | --- | --- |
 | `localhost:8501` cannot open | Start Streamlit and keep its terminal running; read the URL printed in the terminal. |
 | `No module named streamlit` | Install `dashboard/requirements.txt` using the same Python executable that starts the app. |
+| Next run fails with `PipelineBusy` | Check the lock-janitor log; `waiting_for_glue` means a Glue run is still active. Otherwise follow the lock recovery steps. |
 | Missing environment settings | Run the full environment-variable block again in this terminal; check each Terraform output succeeded. |
 | Terraform has no outputs | Run `terraform -chdir=infra init -backend-config=backend.hcl` once (state is in S3, see Deploy); otherwise obtain output values from the operator. |
 | Credentials expired / AssumeRole denied | Check `aws sts get-caller-identity`, your AWS profile/session and the reader's explicit trusted principal. |
@@ -108,7 +109,18 @@ then start a **new complete execution**. Gold writes are not transactional acros
 interrupted same-day run can leave mixed files until repaired. Never use MAX(snapshot_date) as
 proof of healthy publication. Do not redrive only an inner task or bypass lock ownership.
 
-For an aborted/timed-out run with an orphaned lock:
+**Automatic lock recovery.** The `jobmarket-aws-lock-janitor` Lambda runs when an execution ends
+FAILED/TIMED_OUT/ABORTED and every 15 minutes. It deletes the lock only when its owner execution
+has ended, none of the three Glue jobs has an active run, and the crawler is READY; the delete is
+conditional on the inspected owner ARN. It never stops jobs or starts executions. Check its
+decision in `/aws/lambda/jobmarket-aws-lock-janitor` (`action`: `released`, `waiting_for_glue`,
+`waiting_for_crawler`, `owner_running`, `no_lock`). A Glue run that outlives its execution keeps
+the lock until it ends (at most its job timeout); then the next sweep releases it.
+
+Tự động: janitor chỉ gỡ khóa khi execution đã kết thúc **và** Glue/crawler đã dừng. Sau khi log
+báo `released`, bắt đầu một execution mới đầy đủ. Nếu alarm `lock-janitor-errors` báo lỗi, làm thủ công:
+
+Manual fallback for an aborted/timed-out run with an orphaned lock:
 1. Read `LockId=pipeline` in the lock table and record its `ExecutionArn`.
 2. Confirm that execution ended, all three Glue jobs have no active runs, and the crawler is READY.
    Stopping Step Functions does not guarantee external Glue jobs stopped.

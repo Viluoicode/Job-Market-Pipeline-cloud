@@ -16,6 +16,7 @@ runtime roles can write the completion marker. Administrative identities remain 
 | Step Functions | Job/crawler status | Control three jobs/one crawler, Put/Delete only the pipeline lock key, Put completion marker |
 | Daily EventBridge | No lake data | Start this state machine only |
 | Health Lambda | Published metadata only | Its logs and JobMarket/Pipeline metrics only |
+| Lock janitor Lambda | Lock item; owner execution, three job runs and crawler status | Delete only the pipeline lock key (owner-conditional); its logs. No start/stop of executions or jobs |
 | Dashboard reader | Gold, metadata, pipeline lock, Gold Catalog | Athena SELECT workflow in its workgroup and result objects; no lake writes or Glue job execution |
 
 Stage jobs retain bucket-level listing/metadata for their two buckets for Spark compatibility;
@@ -164,6 +165,7 @@ are useful existing boundaries. Lambda does not need SNS Publish: the alarm publ
 | Step Functions | Run/crawler status | Lock item and completion marker only | Control the three jobs and one crawler |
 | EventBridge | None | None | Start only this state machine |
 | Health monitor | Publication metadata only | Own logs/metrics only | Keep existing namespace restriction |
+| Lock janitor | Lock item; execution, job-run and crawler status | Delete the pipeline lock key only | DescribeExecution on this state machine's executions; GetJobRuns on three jobs; GetCrawler |
 | Dashboard reader | Gold, publication metadata; lock GetItem | Athena query output prefix only, no lake/script mutations | Athena Start/Get/GetResults/Stop on designated workgroup; read Gold Catalog metadata |
 | Deployer | Infrastructure configuration and protected state | Upload code/config; reviewed infrastructure and IAM changes | PassRole limited to intended runtime roles/services; independent of dashboard |
 
