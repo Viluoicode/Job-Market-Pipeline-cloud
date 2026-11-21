@@ -1,0 +1,14 @@
+# Tool configuration only; this repository is not packaged.
+[tool.ruff]
+line-length = 120
+# Lowest deployed runtime: Glue Python Shell ingestion runs Python 3.9 (Glue 4.0 Spark: 3.10).
+# A higher target lets pyupgrade emit syntax (e.g. datetime.UTC) that breaks on Glue.
+target-version = "py39"
+
+[tool.ruff.lint]
+# pycodestyle, pyflakes, isort, bugbear, pyupgrade
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixture rows stay one record per line (a readable table); tests add dashboard/ to sys.path first.
+"tests/**" = ["E501", "E402"]

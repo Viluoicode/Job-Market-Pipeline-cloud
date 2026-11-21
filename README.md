@@ -142,6 +142,7 @@ Use **Python 3.11 and Java 17** for the local Spark suite.
 
 ```powershell
 python -m pip install -r requirements-dev.txt
+python -m ruff check .
 python -m pytest tests -q
 terraform -chdir=infra init -backend=false
 terraform -chdir=infra fmt -check -recursive

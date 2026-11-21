@@ -5,3 +5,5 @@ pytest>=8
 # Dashboard display semantics are unit-tested on real pandas/numpy values (same pin as dashboard/).
 pandas>=2.2,<3
 -r requirements.txt
+# Lint (CI runs `ruff check .`; config in pyproject.toml).
+ruff>=0.6,<1

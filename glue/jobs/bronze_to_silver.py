@@ -26,10 +26,9 @@ Args (Glue job parameters):
 import json
 import sys
 
+from pipeline_contract import read_json, silver_path, timestamp, validate_manifest
 from pyspark.sql import DataFrame, Window
 from pyspark.sql import functions as F
-from pipeline_contract import read_json, silver_path, timestamp, validate_manifest
-
 
 # Data Quality gate on the Silver table — the cloud/Glue parallel of SkillRadar's dbt tests
 # (not_null / unique / accepted_values). Rules are written in DQDL (Data Quality Definition

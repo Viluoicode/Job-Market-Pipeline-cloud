@@ -28,9 +28,9 @@ Args (Glue job parameters):
 
 import sys
 
+from pipeline_contract import read_json, silver_path, validate_manifest
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
-from pipeline_contract import read_json, silver_path, validate_manifest
 
 # Role taxonomy: each posting gets AT MOST ONE role family, the first one (top to bottom) with a
 # regex matching its lower-cased title; titles matching ROLE_EXCLUDE get none. Families are ordered
@@ -84,12 +84,14 @@ DEFAULT_ROLES = [
     ]),
     # Second pass: the specialisation written as a qualifier of a generic engineering title.
     ("Data Engineer", [
-        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",  # noqa: E501
     ]),
-    ("ML / AI Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b"]),
+    ("ML / AI Engineer", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b",
+    ]),
     ("Security Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\bsecurity\b"]),
     ("DevOps / SRE / Platform", [
-        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",  # noqa: E501
     ]),
     ("Technical Support Engineer", [r"\bsupport engineer\b", r"\btechnical (?:support|services) engineer\b"]),
     ("Software Engineer (General)", [
@@ -272,7 +274,8 @@ def main() -> None:
     for row in opportunity.collect():
         print(
             f"    #{row['demand_rank']} {row['role']:<28} demand={row['job_count']:<5} "
-            f"remote={row['remote_pct']}% (unknown {row['remote_unknown_pct']}%)  top={row['top_company']} ({row['top_company_count']})"
+            f"remote={row['remote_pct']}% (unknown {row['remote_unknown_pct']}%)  "
+            f"top={row['top_company']} ({row['top_company_count']})"
         )
 
     job.commit()

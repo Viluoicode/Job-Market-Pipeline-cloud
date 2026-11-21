@@ -11,11 +11,10 @@ Rows are tuples in ``conftest.BRONZE_COLUMNS`` order, built via the ``bronze`` f
 
 import hashlib
 
-import pytest
-from pyspark.sql import functions as F
-
 import bronze_to_silver as b2s
+import pytest
 import silver_to_gold as s2g
+from pyspark.sql import functions as F
 
 # Two Data Engineer roles at Databricks + one at Acme; one ML role; one DevOps role posted on two
 # boards (same content) to exercise cross-source dedup.

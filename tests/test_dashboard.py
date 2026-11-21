@@ -1,6 +1,5 @@
 """Publication gating and Gold/display semantics. No live AWS calls."""
 import ast
-import copy
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -32,11 +31,16 @@ def test_current_publication_and_incomplete_coverage():
 def test_reject_unpublished_or_stale_data(kind):
     c, s, m = publication()
     now = datetime(2026, 9, 28, tzinfo=timezone.utc)
-    if kind == "run": s["run_id"] = "other"
-    if kind == "date": m["snapshot_date"] = "2026-09-26"
-    if kind == "failed": m["status"] = "FAILED"
-    if kind == "stale": now = datetime(2026, 9, 30, tzinfo=timezone.utc)
-    if kind == "future": now = datetime(2026, 9, 26, tzinfo=timezone.utc)
+    if kind == "run":
+        s["run_id"] = "other"
+    if kind == "date":
+        m["snapshot_date"] = "2026-09-26"
+    if kind == "failed":
+        m["status"] = "FAILED"
+    if kind == "stale":
+        now = datetime(2026, 9, 30, tzinfo=timezone.utc)
+    if kind == "future":
+        now = datetime(2026, 9, 26, tzinfo=timezone.utc)
     with pytest.raises(data.PublicationUnavailable):
         data.validate_publication(c, s, m, now=now)
 

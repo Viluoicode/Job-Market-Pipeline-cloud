@@ -263,7 +263,8 @@ def fetch_arbeitnow(client, token, company_hint, max_pages=2, with_completeness=
                 raise ValueError("Arbeitnow job is missing its slug")
             company = get_str(job, "company_name") or "arbeitnow"
             created = job.get("created_at")  # unix seconds
-            posted_at = from_epoch_ms(created * 1000) if isinstance(created, int) and not isinstance(created, bool) else None
+            is_epoch = isinstance(created, int) and not isinstance(created, bool)
+            posted_at = from_epoch_ms(created * 1000) if is_epoch else None
             out.append(_record(
                 "arbeitnow", "arbeitnow", slug, company,
                 get_str(job, "title") or "", get_str(job, "location"),
@@ -314,7 +315,8 @@ def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_di
     if not boards or not 0 < min_success_ratio <= 1 or arbeitnow_pages < 1 or timeout <= 0:
         raise ValueError("Nonempty boards, positive timeout/pages and success ratio in (0, 1] required")
     started = datetime.now(timezone.utc)
-    execution_start = datetime.fromisoformat(execution_started_at.replace("Z", "+00:00")) if execution_started_at else started
+    execution_start = (datetime.fromisoformat(execution_started_at.replace("Z", "+00:00"))
+                       if execution_started_at else started)
     if (execution_start.tzinfo is None or snapshot_date != execution_start.astimezone(timezone.utc).date().isoformat()
             or not 0 <= (started - execution_start).total_seconds() <= 24 * 3600):
         raise ValueError("snapshot_date must match the UTC execution start within the last 24 hours")
