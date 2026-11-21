@@ -82,6 +82,27 @@ Checked **28 September 2026** in `ap-southeast-1`; these are historical observat
 The 01:00 local run belongs to the previous UTC date. Use the
 [daily runbook](docs/operations.md#daily-check--kiểm-tra-mỗi-ngày) for today's health.
 
+## Performance and cost
+
+Measured by `scripts/run_metrics.py` over the **7 scheduled runs of 14–20 November 2026**
+(medians; [evidence](docs/evidence/run-metrics-20261121.json)). Baseline before parallel fetching
+and Iceberg.
+
+| Metric | Value |
+| --- | --- |
+| End-to-end (EventBridge → published Gold) | 9m 00s |
+| Ingest / Bronze→Silver / Silver→Gold / crawl | 1m 59s / 2m 58s / 3m 00s / 1m 01s |
+| Glue DPU-seconds per run (3 jobs) | 517 |
+| Glue cost per run: jobs | $0.064 (estimate $0.0632 at $0.44/DPU-hour from the AWS Pricing API; Cost Explorer $0.0635) |
+| Glue cost per run: crawler | $0.049 (Cost Explorer; about 44% of Glue cost for a one-minute crawl) |
+| Rows: Bronze → Silver lifecycle → Gold | 8,099 → 43,540 → 8,505 published postings |
+| Dashboard query scan | 1.0 MiB |
+
+Costs are pre-credit list prices. Lambda, Step Functions, EventBridge and the six alarms stayed in
+the free tier; S3 and DynamoDB added cents per day. Gold can exceed one run's Bronze rows: postings
+from a failed or incomplete board keep their last observation while still inside the freshness
+window ([why](docs/sample_results.md), [lifecycle](docs/architecture.md)).
+
 ## Run the dashboard
 
 There are three separate actions:
