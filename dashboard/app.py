@@ -5,8 +5,7 @@ import os
 import pandas as pd
 import plotly.express as px
 import streamlit as st
-
-from data_access import PublicationUnavailable, read_publication, query_fact, create_reader_session
+from data_access import PublicationUnavailable, create_reader_session, query_fact, read_publication
 from model import REMOTE_LABELS, ROLE_FAMILIES, classify, remote_label, safe_link
 
 st.set_page_config(page_title="Job Market | AWS Workshop", page_icon="📊", layout="wide")
@@ -92,7 +91,8 @@ st.success(f"Published snapshot (UTC): {metadata['snapshot_date']} · "
 st.caption(f"Observed at {metadata['ingested_at']} · Published at {metadata['published_at']} · "
            "Daily schedule: 01:00 UTC+7 (previous calendar date in UTC).")
 if metadata["incomplete_boards"] or metadata["failed_boards"]:
-    st.info(f"Coverage: {metadata['incomplete_boards']} incomplete board(s), {metadata['failed_boards']} failed board(s). "
+    st.info(f"Coverage: {metadata['incomplete_boards']} incomplete board(s), "
+            f"{metadata['failed_boards']} failed board(s). "
             "Incomplete sources are not evidence that unseen jobs have closed.")
 
 frame = pd.DataFrame(rows)
@@ -159,13 +159,16 @@ else:
             source_counts, x="Postings", y="source", orientation="h", title="Postings by source platform",
             labels={"source": ""}, color_discrete_sequence=["#15803D"])), width="stretch", theme=None)
     elif role_counts.empty:
-        col1.info(f"No postings in this view match the {FAMILY_COUNT} role families. They are still shown in the table.")
+        col1.info(f"No postings in this view match the {FAMILY_COUNT} role families. "
+                  "They are still shown in the table.")
     else:
         col1.plotly_chart(style_chart(px.bar(
-            role_counts, x="Postings", y="roles", orientation="h", title=f"Postings by role family ({FAMILY_COUNT} families)",
+            role_counts, x="Postings", y="roles", orientation="h",
+            title=f"Postings by role family ({FAMILY_COUNT} families)",
             labels={"roles": ""}, color_discrete_sequence=["#15803D"])), width="stretch", theme=None)
-    col2.plotly_chart(style_chart(px.bar(companies, x="Postings", y="company", orientation="h", title="Top 10 companies in this view",
-                            labels={"company": ""}, color_discrete_sequence=["#3D8060"])), width="stretch", theme=None)
+    col2.plotly_chart(style_chart(px.bar(
+        companies, x="Postings", y="company", orientation="h", title="Top 10 companies in this view",
+        labels={"company": ""}, color_discrete_sequence=["#3D8060"])), width="stretch", theme=None)
 st.caption("The role chart includes matched families only; each posting belongs to exactly one family. "
            "Work mode Unknown means the source gave no remote signal; it is not counted as remote or onsite. "
            "All metrics follow the filters above.")
@@ -176,9 +179,11 @@ st.dataframe(filtered[["title", "company", "location", "source", "work_mode", "l
                    "work_mode": "Work mode", "last_seen_at": "Last observed (UTC)"})
 with st.expander("Data scope and verification"):
     st.write("These records were active and fresh when Gold was built. Availability can change afterwards; "
-             "verify on the original employer page. This workshop does not rank personal suitability or cover Vietnam specifically.")
+             "verify on the original employer page. This workshop does not rank personal suitability "
+             "or cover Vietnam specifically.")
     st.write(f"Run: {metadata['run_id']}")
-    st.write(f"Raw observations: {metadata['rows_ingested']:,}. Gold counts can differ because of deduplication and lifecycle retention.")
+    st.write(f"Raw observations: {metadata['rows_ingested']:,}. "
+             "Gold counts can differ because of deduplication and lifecycle retention.")
     st.caption(f"Athena query: {query['query_id']} · Scanned: {query['bytes_scanned']:,} bytes. "
                "Results are cached for up to 15 minutes; publication health is checked on each page interaction. "
                "An idle page does not refresh automatically.")

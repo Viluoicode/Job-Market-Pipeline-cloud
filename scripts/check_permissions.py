@@ -6,20 +6,35 @@ from datetime import datetime, timezone
 import boto3
 
 
+def context_entry(key, values, key_type="string"):
+    return {"ContextKeyName": key, "ContextKeyValues": values, "ContextKeyType": key_type}
+
+
 def verify(session, project, lake, scripts, results, database, workgroup):
     iam = session.client("iam")
     account = session.client("sts").get_caller_identity()["Account"]
     region = session.region_name
-    role = lambda name: f"arn:aws:iam::{account}:role/{project}-{name}-role"
-    obj = lambda bucket, key: f"arn:aws:s3:::{bucket}/{key}"
+
+    def role(name):
+        return f"arn:aws:iam::{account}:role/{project}-{name}-role"
+
+    def obj(bucket, key):
+        return f"arn:aws:s3:::{bucket}/{key}"
+
+    def arn(service, resource):
+        return f"arn:aws:{service}:{region}:{account}:{resource}"
+
+    lock_table = arn("dynamodb", f"table/{project}-pipeline-lock")
     checks = []
+
     def check(name, action, resource, allowed, context=None):
         # The simulator asks for keys from unrelated statements too. Supply a complete
         # context so negative cases cannot pass merely because a condition key is absent.
         context_by_name = {
-            "s3:prefix": {"ContextKeyName": "s3:prefix", "ContextKeyValues": ["gold/fact_job_posting/"], "ContextKeyType": "string"},
-            "cloudwatch:namespace": {"ContextKeyName": "cloudwatch:namespace", "ContextKeyValues": ["JobMarket/Pipeline" if name == "health-monitor" else "Glue"], "ContextKeyType": "string"},
-            "dynamodb:LeadingKeys": {"ContextKeyName": "dynamodb:LeadingKeys", "ContextKeyValues": ["pipeline"], "ContextKeyType": "stringList"},
+            "s3:prefix": context_entry("s3:prefix", ["gold/fact_job_posting/"]),
+            "cloudwatch:namespace": context_entry(
+                "cloudwatch:namespace", ["JobMarket/Pipeline" if name == "health-monitor" else "Glue"]),
+            "dynamodb:LeadingKeys": context_entry("dynamodb:LeadingKeys", ["pipeline"], "stringList"),
         }
         context_by_name.update({c["ContextKeyName"]: c for c in context or []})
         response = iam.simulate_principal_policy(
@@ -37,8 +52,10 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         check(name, "s3:PutObject", obj(lake, "state/pipeline/latest.json"), False)
     check("ingestion", "s3:PutObject", obj(lake, "bronze/run_id=probe/source=x/board=y/jobs.json"), True)
     check("ingestion", "s3:PutObject", obj(lake, "gold/fact_job_posting/probe.parquet"), False)
-    for name, prefix, opposite in [("silver", "silver/runs/probe/jobs/x.parquet", "gold/fact_job_posting/x.parquet"),
-                                   ("gold", "gold/fact_job_posting/snapshot_date=2026-09-30/x.parquet", "silver/runs/probe/jobs/x.parquet")]:
+    for name, prefix, opposite in [
+        ("silver", "silver/runs/probe/jobs/x.parquet", "gold/fact_job_posting/x.parquet"),
+        ("gold", "gold/fact_job_posting/snapshot_date=2026-09-30/x.parquet", "silver/runs/probe/jobs/x.parquet"),
+    ]:
         for action in ["s3:PutObject", "s3:DeleteObject"]:
             check(name, action, obj(lake, prefix), True)
             check(name, action, obj(lake, opposite), False)
@@ -58,20 +75,20 @@ def verify(session, project, lake, scripts, results, database, workgroup):
     check("dashboard-reader", "s3:PutObject", obj(lake, "gold/fact_job_posting/x.parquet"), False)
     check("dashboard-reader", "s3:PutObject", obj(results, "results/query.csv"), True)
     check("dashboard-reader", "glue:StartJobRun", f"arn:aws:glue:{region}:{account}:job/{project}-ingestion", False)
-    check("dashboard-reader", "athena:StartQueryExecution", f"arn:aws:athena:{region}:{account}:workgroup/{workgroup}", True)
-    check("dashboard-reader", "athena:StartQueryExecution", f"arn:aws:athena:{region}:{account}:workgroup/primary", False)
+    check("dashboard-reader", "athena:StartQueryExecution", arn("athena", f"workgroup/{workgroup}"), True)
+    check("dashboard-reader", "athena:StartQueryExecution", arn("athena", "workgroup/primary"), False)
     # Lock janitor: inspect/release only the pipeline lock; it can never start or stop work.
     sm = f"{project}-pipeline"
     check("lock-janitor", "states:DescribeExecution", f"arn:aws:states:{region}:{account}:execution:{sm}:probe", True)
     check("lock-janitor", "states:StartExecution", f"arn:aws:states:{region}:{account}:stateMachine:{sm}", False)
     check("lock-janitor", "glue:GetJobRuns", f"arn:aws:glue:{region}:{account}:job/{project}-silver-to-gold", True)
-    check("lock-janitor", "glue:BatchStopJobRun", f"arn:aws:glue:{region}:{account}:job/{project}-silver-to-gold", False)
-    check("lock-janitor", "dynamodb:PutItem", f"arn:aws:dynamodb:{region}:{account}:table/{project}-pipeline-lock", False)
+    check("lock-janitor", "glue:BatchStopJobRun", arn("glue", f"job/{project}-silver-to-gold"), False)
+    check("lock-janitor", "dynamodb:PutItem", lock_table, False)
     for name, action in [("sfn", "dynamodb:PutItem"), ("dashboard-reader", "dynamodb:GetItem"),
                          ("lock-janitor", "dynamodb:DeleteItem")]:
         for key in ["pipeline", "another-key"]:
-            check(name, action, f"arn:aws:dynamodb:{region}:{account}:table/{project}-pipeline-lock", key == "pipeline",
-                  [{"ContextKeyName": "dynamodb:LeadingKeys", "ContextKeyValues": [key], "ContextKeyType": "stringList"}])
+            check(name, action, lock_table, key == "pipeline",
+                  [context_entry("dynamodb:LeadingKeys", [key], "stringList")])
     bucket_checks = []
     s3 = session.client("s3")
     for bucket in [lake, scripts, results]:
@@ -86,10 +103,13 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         bucket_checks.append({"bucket": bucket, "https_deny": transport, "public_access_block": block,
                               "ownership": ownership,
                               "versioning": s3.get_bucket_versioning(Bucket=bucket).get("Status", "Disabled"),
-                              "passed": transport and all(block.values()) and ownership == [{"ObjectOwnership": "BucketOwnerEnforced"}]})
+                              "passed": transport and all(block.values())
+                              and ownership == [{"ObjectOwnership": "BucketOwnerEnforced"}]})
     return {"checked_at": datetime.now(timezone.utc).isoformat(),
-            "method": "IAM identity-policy simulation plus direct S3 configuration reads; not destructive probes or a complete account audit",
-            "passed": all(c["passed"] and not c["missing_context"] for c in checks) and all(c["passed"] for c in bucket_checks),
+            "method": "IAM identity-policy simulation plus direct S3 configuration reads; "
+                      "not destructive probes or a complete account audit",
+            "passed": all(c["passed"] and not c["missing_context"] for c in checks)
+            and all(c["passed"] for c in bucket_checks),
             "checks": checks, "buckets": bucket_checks}
 
 

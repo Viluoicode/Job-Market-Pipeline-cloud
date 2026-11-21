@@ -3,9 +3,8 @@ import json
 from datetime import datetime, timezone
 
 import httpx
-import pytest
-
 import land_to_bronze as ingest
+import pytest
 from pipeline_contract import validate_manifest
 
 

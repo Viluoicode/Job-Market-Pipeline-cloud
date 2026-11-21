@@ -48,12 +48,14 @@ DEFAULT_ROLES = [
     ]),
     # Second pass: the specialisation written as a qualifier of a generic engineering title.
     ("Data Engineer", [
-        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:data (?:platform|infrastructure|pipelines?)|big data)\b",  # noqa: E501
     ]),
-    ("ML / AI Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b"]),
+    ("ML / AI Engineer", [
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:machine learning|ml infrastructure)\b",
+    ]),
     ("Security Engineer", [r"(?:engineer|engineering|developer|entwickler)\b.*\bsecurity\b"]),
     ("DevOps / SRE / Platform", [
-        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",
+        r"(?:engineer|engineering|developer|entwickler)\b.*\b(?:infrastructure|infra|observability|ci/cd|developer productivity|developer infrastructure|reliability)\b",  # noqa: E501
     ]),
     ("Technical Support Engineer", [r"\bsupport engineer\b", r"\btechnical (?:support|services) engineer\b"]),
     ("Software Engineer (General)", [

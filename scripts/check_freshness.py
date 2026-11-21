@@ -41,8 +41,10 @@ def main():
     s3 = boto3.client("s3", region_name=args.region)
     completion = read_json(s3, args.bucket, "state/pipeline/latest.json", optional=True)
     silver = read_json(s3, args.bucket, "state/silver/latest.json", optional=True)
-    manifest = read_json(s3, args.bucket,
-        f"control/ingestion/run_id={completion['run_id']}/manifest.json", optional=True) if isinstance(completion, dict) and completion.get("run_id") else None
+    manifest = None
+    if isinstance(completion, dict) and completion.get("run_id"):
+        manifest = read_json(s3, args.bucket,
+                             f"control/ingestion/run_id={completion['run_id']}/manifest.json", optional=True)
     result = assess(completion, silver, manifest, max_age_hours=args.max_age_hours)
     print(json.dumps(result, indent=2))
     return 0 if result["healthy"] else 1
