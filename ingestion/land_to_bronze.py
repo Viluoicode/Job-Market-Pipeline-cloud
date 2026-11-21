@@ -308,33 +308,50 @@ def put_bytes(key, body, *, s3=None, bucket=None, out_dir=None, content_type="ap
         s3.put_object(Bucket=bucket, Key=key, Body=body, ContentType=content_type)
 
 
-def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_dir=None,
-                  min_success_ratio=0.8, arbeitnow_pages=2, timeout=20.0, client=None,
-                  execution_started_at=None):
+def resolve_run_clock(run_id, snapshot_date, execution_started_at, *, boards,
+                      min_success_ratio, arbeitnow_pages, timeout):
+    """Validate the run arguments; return (started, execution_start) as aware UTC datetimes.
+
+    snapshot_date is the UTC date of the Step Functions execution start, which must be at most
+    24 hours old, so a retried run keeps its original date even after midnight.
+    """
     validate_run_id(run_id)
     if not boards or not 0 < min_success_ratio <= 1 or arbeitnow_pages < 1 or timeout <= 0:
         raise ValueError("Nonempty boards, positive timeout/pages and success ratio in (0, 1] required")
     started = datetime.now(timezone.utc)
     execution_start = (datetime.fromisoformat(execution_started_at.replace("Z", "+00:00"))
                        if execution_started_at else started)
-    if (execution_start.tzinfo is None or snapshot_date != execution_start.astimezone(timezone.utc).date().isoformat()
-            or not 0 <= (started - execution_start).total_seconds() <= 24 * 3600):
+    if execution_start.tzinfo is None:
         raise ValueError("snapshot_date must match the UTC execution start within the last 24 hours")
-    manifest_key = f"control/ingestion/run_id={run_id}/manifest.json"
-    existing = None
+    same_utc_date = snapshot_date == execution_start.astimezone(timezone.utc).date().isoformat()
+    recent = 0 <= (started - execution_start).total_seconds() <= 24 * 3600
+    if not (same_utc_date and recent):
+        raise ValueError("snapshot_date must match the UTC execution start within the last 24 hours")
+    return started, execution_start
+
+
+def read_existing_manifest(manifest_key, *, s3=None, bucket=None, out_dir=None):
+    """Return the manifest already written for this run, or None."""
     if out_dir:
-        existing_path = Path(out_dir) / manifest_key
-        if existing_path.exists():
-            existing = json.loads(existing_path.read_text(encoding="utf-8"))
-    else:
-        found = s3.list_objects_v2(Bucket=bucket, Prefix=manifest_key, MaxKeys=1)
-        if any(item["Key"] == manifest_key for item in found.get("Contents", [])):
-            existing = json.loads(s3.get_object(Bucket=bucket, Key=manifest_key)["Body"].read())
-    if existing and existing.get("status") == "SUCCEEDED":
-        if existing.get("run_id") != run_id or existing.get("snapshot_date") != snapshot_date:
-            raise ValueError("Existing run manifest has different identity")
-        print(f"[ingest] reusing immutable committed run {run_id}")
-        return existing
+        path = Path(out_dir) / manifest_key
+        return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+    found = s3.list_objects_v2(Bucket=bucket, Prefix=manifest_key, MaxKeys=1)
+    if any(item["Key"] == manifest_key for item in found.get("Contents", [])):
+        return json.loads(s3.get_object(Bucket=bucket, Key=manifest_key)["Body"].read())
+    return None
+
+
+def committed_manifest(existing, run_id, snapshot_date):
+    """A SUCCEEDED manifest is immutable: a retry reuses it instead of fetching again."""
+    if not existing or existing.get("status") != "SUCCEEDED":
+        return None
+    if existing.get("run_id") != run_id or existing.get("snapshot_date") != snapshot_date:
+        raise ValueError("Existing run manifest has different identity")
+    return existing
+
+
+def validate_boards(boards):
+    """Reject unknown sources, empty or duplicate tokens and a misconfigured Arbeitnow feed."""
     unique = set()
     for board in boards:
         source, token = board.get("source", "").lower().strip(), board.get("token", "")
@@ -344,59 +361,90 @@ def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_di
             raise ValueError("Arbeitnow uses the single board token 'arbeitnow'")
         unique.add((source, token))
 
-    owned_client = client is None
-    client = client or httpx.Client(timeout=timeout, follow_redirects=True,
-                                   headers={"User-Agent": "jobmarket-aws-pipeline/2.0 (+portfolio)"})
+
+def fetch_board(client, board, arbeitnow_pages):
+    """Call one board's API. Returns (records, complete); raises on any API/parsing failure."""
+    source, token = board["source"].lower().strip(), board["token"]
+    if source == "arbeitnow":
+        return fetch_arbeitnow(client, token, board.get("company"), arbeitnow_pages, with_completeness=True)
+    return CONNECTORS[source](client, token, board.get("company")), True
+
+
+def ingest_board(client, board, *, run_id, arbeitnow_pages, s3=None, bucket=None, out_dir=None):
+    """Fetch one board and land it in Bronze; return its manifest entry.
+
+    An API failure only marks this board FAILED. A storage failure propagates and aborts the run:
+    it says nothing about the source, and a manifest must never reference an unwritten object.
+    """
+    source, token = board["source"].lower().strip(), board["token"]
+    entry = {"source": source, "board_token": token, "status": "FAILED", "complete": False, "row_count": 0}
+    try:
+        records, complete = fetch_board(client, board, arbeitnow_pages)
+    except Exception as exc:
+        entry["error_type"] = type(exc).__name__
+        if isinstance(exc, httpx.HTTPStatusError):
+            entry["http_status"] = exc.response.status_code
+        print(f"[ingest] {source}/{token}: FAILED ({type(exc).__name__}, "
+              f"http_status={entry.get('http_status', 'n/a')})", file=sys.stderr)
+        return entry
+    fetched_at = datetime.now(timezone.utc).isoformat()
+    for record in records:
+        record.update(run_id=run_id, fetched_at=fetched_at)
+    key = f"bronze/run_id={run_id}/source={source}/board={quote(token, safe='')}/jobs.json"
+    body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records).encode("utf-8")
+    put_bytes(key, body, s3=s3, bucket=bucket, out_dir=out_dir, content_type="application/x-ndjson")
+    entry.update(status="SUCCEEDED", complete=complete, row_count=len(records), key=key, fetched_at=fetched_at)
+    print(f"[ingest] {source}/{token}: {len(records)} postings (complete={complete})")
+    return entry
+
+
+def finalize_manifest(manifest, n_boards, min_success_ratio):
+    """Add completion counters and decide the run status."""
+    succeeded = sum(b["status"] == "SUCCEEDED" for b in manifest["boards"])
+    manifest.update(completed_at=datetime.now(timezone.utc).isoformat(),
+                    successful_boards=succeeded, failed_boards=n_boards - succeeded,
+                    success_ratio=succeeded / n_boards)
+    # An empty market is not automatically published: a zero-row run requires investigation.
+    has_rows = manifest["total_records"] > 0
+    manifest["status"] = "SUCCEEDED" if has_rows and manifest["success_ratio"] >= min_success_ratio else "FAILED"
+    return manifest
+
+
+def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_dir=None,
+                  min_success_ratio=0.8, arbeitnow_pages=2, timeout=20.0, client=None,
+                  execution_started_at=None):
+    """Fetch every board into Bronze, then commit the run manifest (written last)."""
+    started, execution_start = resolve_run_clock(
+        run_id, snapshot_date, execution_started_at, boards=boards,
+        min_success_ratio=min_success_ratio, arbeitnow_pages=arbeitnow_pages, timeout=timeout)
+    manifest_key = f"control/ingestion/run_id={run_id}/manifest.json"
+    existing = read_existing_manifest(manifest_key, s3=s3, bucket=bucket, out_dir=out_dir)
+    committed = committed_manifest(existing, run_id, snapshot_date)
+    if committed:
+        print(f"[ingest] reusing immutable committed run {run_id}")
+        return committed
+    validate_boards(boards)
+
     manifest = {"version": 1, "run_id": run_id, "snapshot_date": snapshot_date,
                 "started_at": started.isoformat(), "execution_started_at": execution_start.isoformat(),
                 "boards": [], "total_records": 0}
+    owned_client = client is None
+    client = client or httpx.Client(timeout=timeout, follow_redirects=True,
+                                   headers={"User-Agent": "jobmarket-aws-pipeline/2.0 (+portfolio)"})
     try:
         for board in boards:
-            source, token = board["source"].lower().strip(), board["token"]
-            entry = {"source": source, "board_token": token, "status": "FAILED",
-                     "complete": False, "row_count": 0}
-            try:
-                if source == "arbeitnow":
-                    records, complete = fetch_arbeitnow(client, token, board.get("company"),
-                                                        arbeitnow_pages, with_completeness=True)
-                else:
-                    records = CONNECTORS[source](client, token, board.get("company"))
-                    complete = True
-            except Exception as exc:
-                entry["error_type"] = type(exc).__name__
-                if isinstance(exc, httpx.HTTPStatusError):
-                    entry["http_status"] = exc.response.status_code
-                print(f"[ingest] {source}/{token}: FAILED ({type(exc).__name__}, "
-                      f"http_status={entry.get('http_status', 'n/a')})", file=sys.stderr)
-            else:
-                fetched_at = datetime.now(timezone.utc).isoformat()
-                for record in records:
-                    record.update(run_id=run_id, fetched_at=fetched_at)
-                key = f"bronze/run_id={run_id}/source={source}/board={quote(token, safe='')}/jobs.json"
-                body = "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in records).encode("utf-8")
-                # Storage errors abort the whole run; they cannot be classified as API failures.
-                put_bytes(key, body, s3=s3, bucket=bucket, out_dir=out_dir,
-                          content_type="application/x-ndjson")
-                entry.update(status="SUCCEEDED", complete=complete, row_count=len(records),
-                             key=key, fetched_at=fetched_at)
-                manifest["total_records"] += len(records)
-                print(f"[ingest] {source}/{token}: {len(records)} postings (complete={complete})")
+            entry = ingest_board(client, board, run_id=run_id, arbeitnow_pages=arbeitnow_pages,
+                                 s3=s3, bucket=bucket, out_dir=out_dir)
             manifest["boards"].append(entry)
+            manifest["total_records"] += entry["row_count"]
     finally:
         if owned_client:
             client.close()
 
-    succeeded = sum(b["status"] == "SUCCEEDED" for b in manifest["boards"])
-    manifest.update(completed_at=datetime.now(timezone.utc).isoformat(),
-                    successful_boards=succeeded, failed_boards=len(boards) - succeeded,
-                    success_ratio=succeeded / len(boards))
-    # An empty market is not automatically published: a zero-row run requires investigation.
-    manifest["status"] = ("SUCCEEDED" if manifest["total_records"] > 0 and
-                          manifest["success_ratio"] >= min_success_ratio else "FAILED")
-    key = manifest_key
-    put_bytes(key, json.dumps(manifest, indent=2).encode("utf-8"),
+    finalize_manifest(manifest, len(boards), min_success_ratio)
+    put_bytes(manifest_key, json.dumps(manifest, indent=2).encode("utf-8"),
               s3=s3, bucket=bucket, out_dir=out_dir)
-    print(f"[ingest] {manifest['status']}: {manifest['total_records']} rows; manifest={key}")
+    print(f"[ingest] {manifest['status']}: {manifest['total_records']} rows; manifest={manifest_key}")
     return manifest
 
 
