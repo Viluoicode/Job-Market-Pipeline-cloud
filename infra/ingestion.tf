@@ -97,5 +97,6 @@ resource "aws_dynamodb_table" "pipeline_lock" {
     type = "S"
   }
   # No TTL: an automatic expiry could unlock while Glue is still writing after SFN times out.
-  # An aborted/timed-out execution requires the recovery procedure in docs/operations.md.
+  # An aborted/timed-out execution's lock is released by the lock janitor (lock_janitor.tf) only
+  # after Glue and the crawler are idle; docs/operations.md keeps the manual fallback.
 }

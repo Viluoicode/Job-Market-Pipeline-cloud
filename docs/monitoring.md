@@ -10,7 +10,7 @@ Historical deployment/test evidence remains in [monitoring-20260917.json](eviden
 Lambda reads control metadata, emits `Healthy` and `SourceSuccessRatio` in `JobMarket/Pipeline`,
 and has no lake-write or pipeline-start permissions. Logs are retained for 14 days.
 
-## Năm cảnh báo đang có
+## Sáu cảnh báo đang có
 
 | Tên (prefix jobmarket-aws-) | Khi nào cảnh báo | Xử lý ban đầu |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ and has no lake-write or pipeline-start permissions. Logs are retained for 14 da
 | pipeline-aborted | Có execution ABORTED; Sum trong 5 phút >= 1 | Kiểm tra job và làm theo runbook phục hồi khóa |
 | pipeline-unhealthy | Healthy < 1 hoặc mất metric trong 2 kỳ 15 phút | Kiểm tra Lambda logs, marker và tuổi ingestion |
 | source-coverage-low | Tỷ lệ board thành công < 100% trong 2 kỳ 15 phút | Xem board lỗi trong manifest của lượt đã công bố |
+| lock-janitor-errors | Lambda lock janitor lỗi; Sum Errors trong 15 phút >= 1 | Xem log janitor, gỡ khóa thủ công theo runbook |
 
 Health check chặn ingestion cũ quá **26 giờ**, thời gian ở tương lai, metadata thiếu/sai,
 và Silver mới chưa được Gold công bố hoàn chỉnh. Hai kỳ đánh giá giúp tránh báo động do khoảng
@@ -32,7 +33,8 @@ không tự làm giảm coverage. Nếu ingestion thất bại trước khi côn
 execution xử lý; coverage không đại diện cho lượt thất bại chưa commit.
 
 SNS gửi khi alarm chuyển sang ALARM; hai alarm health/coverage cũng gửi khi trở lại OK.
-Các cảnh báo này không tự khởi động lại pipeline và không tự xóa khóa DynamoDB.
+Các cảnh báo này không tự khởi động lại pipeline và không tự xóa khóa DynamoDB. Việc gỡ khóa
+mồ côi do Lambda lock janitor riêng đảm nhận, có kiểm tra Glue/crawler (xem operations.md).
 
 
 ## Email verification / Kiểm tra email
@@ -49,7 +51,8 @@ Email không được ghi trong evidence công khai.
 Use [the daily runbook](operations.md#daily-check--kiểm-tra-mỗi-ngày) for executions, S3 metadata
 and dashboard verification. CloudWatch Logs group: `/aws/lambda/jobmarket-aws-health-monitor`.
 For failures, inspect stage logs and follow the lock recovery procedure; alarms never remove locks
-or automatically restart the data pipeline.
+or automatically restart the data pipeline. Orphaned-lock release is the lock janitor's job:
+`/aws/lambda/jobmarket-aws-lock-janitor`.
 
 The saved Athena query **Jobs observed today (Vietnam)** uses Vietnam's timezone to select
 observations. Its name does **not** mean jobs located in Vietnam. `sql/inspect_today_jobs.sql`

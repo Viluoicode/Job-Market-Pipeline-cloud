@@ -31,7 +31,7 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         checks.append({"role": name, "action": action, "resource": resource,
                        "expected": "allowed" if allowed else "denied", "decision": actual,
                        "missing_context": response.get("MissingContextValues", []), "passed": passed})
-    for name in ["ingestion", "silver", "gold", "crawler", "health-monitor", "dashboard-reader"]:
+    for name in ["ingestion", "silver", "gold", "crawler", "health-monitor", "dashboard-reader", "lock-janitor"]:
         check(name, "s3:PutObject", obj(scripts, "jobs/silver_to_gold.py"), False)
         check(name, "s3:DeleteObject", obj(lake, "bronze/run_id=probe/source=x/board=y/jobs.json"), False)
         check(name, "s3:PutObject", obj(lake, "state/pipeline/latest.json"), False)
@@ -60,7 +60,15 @@ def verify(session, project, lake, scripts, results, database, workgroup):
     check("dashboard-reader", "glue:StartJobRun", f"arn:aws:glue:{region}:{account}:job/{project}-ingestion", False)
     check("dashboard-reader", "athena:StartQueryExecution", f"arn:aws:athena:{region}:{account}:workgroup/{workgroup}", True)
     check("dashboard-reader", "athena:StartQueryExecution", f"arn:aws:athena:{region}:{account}:workgroup/primary", False)
-    for name, action in [("sfn", "dynamodb:PutItem"), ("dashboard-reader", "dynamodb:GetItem")]:
+    # Lock janitor: inspect/release only the pipeline lock; it can never start or stop work.
+    sm = f"{project}-pipeline"
+    check("lock-janitor", "states:DescribeExecution", f"arn:aws:states:{region}:{account}:execution:{sm}:probe", True)
+    check("lock-janitor", "states:StartExecution", f"arn:aws:states:{region}:{account}:stateMachine:{sm}", False)
+    check("lock-janitor", "glue:GetJobRuns", f"arn:aws:glue:{region}:{account}:job/{project}-silver-to-gold", True)
+    check("lock-janitor", "glue:BatchStopJobRun", f"arn:aws:glue:{region}:{account}:job/{project}-silver-to-gold", False)
+    check("lock-janitor", "dynamodb:PutItem", f"arn:aws:dynamodb:{region}:{account}:table/{project}-pipeline-lock", False)
+    for name, action in [("sfn", "dynamodb:PutItem"), ("dashboard-reader", "dynamodb:GetItem"),
+                         ("lock-janitor", "dynamodb:DeleteItem")]:
         for key in ["pipeline", "another-key"]:
             check(name, action, f"arn:aws:dynamodb:{region}:{account}:table/{project}-pipeline-lock", key == "pipeline",
                   [{"ContextKeyName": "dynamodb:LeadingKeys", "ContextKeyValues": [key], "ContextKeyType": "stringList"}])
