@@ -10,9 +10,31 @@ Review `infra/terraform.tfvars.example`; keep real emails and account settings o
 For a new deployment only, copy the example to `infra/terraform.tfvars` and edit it.
 Do not overwrite an existing deployment's tfvars or state.
 
+### Remote state / State trên S3 (one-time)
+
+Terraform state lives in an S3 bucket created **by hand, outside this stack**, so destroying the
+stack can never delete its own state. Locking uses the S3 lock file (`use_lockfile`, Terraform ≥ 1.10).
+State bucket do bạn tạo tay một lần, không do stack quản lý; `backend.hcl` chứa tên bucket và không commit.
+
+```powershell
+$account = aws sts get-caller-identity --query Account --output text
+$stateBucket = "jobmarket-aws-tfstate-$account-ap-southeast-1"
+aws s3api create-bucket --bucket $stateBucket --region ap-southeast-1 `
+  --create-bucket-configuration LocationConstraint=ap-southeast-1
+aws s3api put-bucket-versioning --bucket $stateBucket --versioning-configuration Status=Enabled
+aws s3api put-public-access-block --bucket $stateBucket --public-access-block-configuration `
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+"bucket = `"$stateBucket`"" | Set-Content -Encoding utf8 infra/backend.hcl
+```
+
+Moving an existing local state: back up `infra/terraform.tfstate` outside the repo first, then run
+`terraform -chdir=infra init -migrate-state -backend-config=backend.hcl` and answer `yes`.
+A following `terraform plan` must show no unexpected changes. Every other machine runs the
+`init -backend-config=backend.hcl` line below once; it then reads the same state.
+
 ```powershell
 aws sts get-caller-identity
-terraform -chdir=infra init
+terraform -chdir=infra init -backend-config=backend.hcl
 terraform -chdir=infra fmt -check -recursive
 terraform -chdir=infra validate
 terraform -chdir=infra plan -out=workshop.tfplan
@@ -63,7 +85,7 @@ of deploying resources or starting a pipeline execution.
 | `localhost:8501` cannot open | Start Streamlit and keep its terminal running; read the URL printed in the terminal. |
 | `No module named streamlit` | Install `dashboard/requirements.txt` using the same Python executable that starts the app. |
 | Missing environment settings | Run the full environment-variable block again in this terminal; check each Terraform output succeeded. |
-| Terraform has no outputs | Use the existing stack's state/configuration or obtain output values; a fresh clone contains no private state. |
+| Terraform has no outputs | Run `terraform -chdir=infra init -backend-config=backend.hcl` once (state is in S3, see Deploy); otherwise obtain output values from the operator. |
 | Credentials expired / AssumeRole denied | Check `aws sts get-caller-identity`, your AWS profile/session and the reader's explicit trusted principal. |
 | Pipeline in progress | Wait for the full execution to finish, then Refresh; the guard prevents reading during writes. |
 | Older than 26 hours / mismatched publication | Follow the daily check and recovery steps; do not change timestamps or disable the guard. |
