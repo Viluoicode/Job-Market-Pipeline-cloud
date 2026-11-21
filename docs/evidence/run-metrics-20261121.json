@@ -1,0 +1,305 @@
+{
+  "generated_at": "2026-11-21T14:59:28+00:00",
+  "region": "ap-southeast-1",
+  "method": "Step Functions history, Glue job runs, AWS Pricing API, published state, dashboard Athena query",
+  "price": {
+    "usd_per_dpu_hour": 0.44,
+    "usagetype": "APS1-ETL-DPU-Hour",
+    "description": "$0.44 per Data Processing Unit-Hour for AWS Glue ETL job"
+  },
+  "executions": [
+    {
+      "name": "55849327-3fe7-658d-a254-0da2ec2f0d60_28b76f25-6af3-dd7c-cbe2-efc11d2fe18c",
+      "start": "2026-11-20T18:00:16.350000+00:00",
+      "total_seconds": 537.205,
+      "stages": {
+        "Ingest": 125.342,
+        "BronzeToSilver": 168.458,
+        "SilverToGold": 182.409,
+        "Crawl": 60.576
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_808cf1ae75c686f14bf94591fb5e338975bde81fabc62d29185aaf0f4450d0f6",
+          "state": "SUCCEEDED",
+          "execution_seconds": 70,
+          "dpu_seconds": 4.375
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_4c7dbfd679cc70c85d7dcafe5c394727f6d173538a969a11a408860ddccdddce",
+          "state": "SUCCEEDED",
+          "execution_seconds": 141,
+          "dpu_seconds": 283.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_48ee6281f7a1cc4c45acf082063629558bb8c6ef7c5e78d78ccf9220746b27dc",
+          "state": "SUCCEEDED",
+          "execution_seconds": 125,
+          "dpu_seconds": 250.0
+        }
+      ],
+      "glue_dpu_seconds": 537.375,
+      "glue_cost_usd": 0.065679
+    },
+    {
+      "name": "ab42cb47-45a0-5496-bac3-9f6649b7a977_29566738-1efd-b3af-6c47-9ed8ea5a9c44",
+      "start": "2026-11-19T18:00:16.303000+00:00",
+      "total_seconds": 554.282,
+      "stages": {
+        "Ingest": 115.355,
+        "BronzeToSilver": 251.541,
+        "SilverToGold": 126.378,
+        "Crawl": 60.618
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_02f3a57e81d0ef8fe408c4b219ef8f7438018693625a72e6355ad91567c09a17",
+          "state": "SUCCEEDED",
+          "execution_seconds": 54,
+          "dpu_seconds": 3.375
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_89c584579ccce025765103c3a62c87a6f9e987e4d179c4b495ba9613c92290bf",
+          "state": "SUCCEEDED",
+          "execution_seconds": 160,
+          "dpu_seconds": 321.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_f562801604492eb89c5f03e5c2f96d3453763c4f7f58f3ec8d9ceb550714b61a",
+          "state": "SUCCEEDED",
+          "execution_seconds": 96,
+          "dpu_seconds": 193.0
+        }
+      ],
+      "glue_dpu_seconds": 517.375,
+      "glue_cost_usd": 0.063235
+    },
+    {
+      "name": "5f9cf9cd-482d-3ffa-f4e4-bf9f123d4535_3b94f782-0847-e2de-3c7f-6162be05176d",
+      "start": "2026-11-18T18:00:16.260000+00:00",
+      "total_seconds": 485.179,
+      "stages": {
+        "Ingest": 120.443,
+        "BronzeToSilver": 175.437,
+        "SilverToGold": 128.376,
+        "Crawl": 60.538
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_d7e7297b52078e114ee76f81a76e398e69298852053492158c157ce8ac1c3e7d",
+          "state": "SUCCEEDED",
+          "execution_seconds": 94,
+          "dpu_seconds": 5.875
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_8413373935291eb26917dda2c03dee45e7eb1656e734e32cf387b53d7bc3e0e5",
+          "state": "SUCCEEDED",
+          "execution_seconds": 136,
+          "dpu_seconds": 272.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_d91b8678fe82f623d86c319340fe74b00b1465597831396d267d24ab49b7943e",
+          "state": "SUCCEEDED",
+          "execution_seconds": 101,
+          "dpu_seconds": 203.0
+        }
+      ],
+      "glue_dpu_seconds": 480.875,
+      "glue_cost_usd": 0.058774
+    },
+    {
+      "name": "dc0d0dc2-8955-9834-fdef-0ebc0226f52f_f5b8fd8b-1167-15eb-b285-d0caf9be245f",
+      "start": "2026-11-17T18:00:16.249000+00:00",
+      "total_seconds": 487.231,
+      "stages": {
+        "Ingest": 125.37,
+        "BronzeToSilver": 177.504,
+        "SilverToGold": 123.362,
+        "Crawl": 60.598
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_352bbc462de3dc7076d1dfa6a2d40955714afa32399b820c6a80684f8149151f",
+          "state": "SUCCEEDED",
+          "execution_seconds": 45,
+          "dpu_seconds": 2.8125
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_0f56656ff9693b7d26ca3d46bde6769e39f8908e29fc15b68f1eceacf67017af",
+          "state": "SUCCEEDED",
+          "execution_seconds": 136,
+          "dpu_seconds": 273.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_5d1f65cb88d19840ed31ce71c5aa72bfc5061df9c789b91a9a57011868be1a45",
+          "state": "SUCCEEDED",
+          "execution_seconds": 99,
+          "dpu_seconds": 199.0
+        }
+      ],
+      "glue_dpu_seconds": 474.8125,
+      "glue_cost_usd": 0.058033
+    },
+    {
+      "name": "601a4fc6-86c7-dbd6-f3b6-86bddb6bbb95_80bbeac8-a4ad-9549-524a-6eb93de03236",
+      "start": "2026-11-16T18:00:16.167000+00:00",
+      "total_seconds": 581.307,
+      "stages": {
+        "Ingest": 110.343,
+        "BronzeToSilver": 229.507,
+        "SilverToGold": 180.473,
+        "Crawl": 60.61
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_62ea998ffe5fff69b862bd0eab191765cc680e6a2e13a40aa8fb726c8897fa82",
+          "state": "SUCCEEDED",
+          "execution_seconds": 49,
+          "dpu_seconds": 3.0625
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_a07510b8ea35e20e3ff038441e44a58bb0be6cc56cc0ff7ab788a2d1447da547",
+          "state": "SUCCEEDED",
+          "execution_seconds": 186,
+          "dpu_seconds": 373.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_9cc2bceeced900425a04e0f36f34d558cfc15c57f0a1d41b833810f2a15b449d",
+          "state": "SUCCEEDED",
+          "execution_seconds": 103,
+          "dpu_seconds": 207.0
+        }
+      ],
+      "glue_dpu_seconds": 583.0625,
+      "glue_cost_usd": 0.071263
+    },
+    {
+      "name": "19d03da0-b885-df42-a44f-1807df70e40f_6c829a83-ec6a-7222-36a8-8ec808016bf6",
+      "start": "2026-11-15T18:00:16.265000+00:00",
+      "total_seconds": 602.283,
+      "stages": {
+        "Ingest": 117.352,
+        "BronzeToSilver": 238.532,
+        "SilverToGold": 185.435,
+        "Crawl": 60.581
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_a373bb23a8ea4ebd79cac7a87dc4397229462dacf41c8860e4eb99d434c5daf5",
+          "state": "SUCCEEDED",
+          "execution_seconds": 40,
+          "dpu_seconds": 2.5
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_36454e52f9b834c8461b65bb53e0c9b61995ed7e612046c9115ecaf6364585a1",
+          "state": "SUCCEEDED",
+          "execution_seconds": 163,
+          "dpu_seconds": 326.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_0fefb5d9596af97271e8f8faf346e33254c3c30e60cf337ba3809b8a4de90cb3",
+          "state": "SUCCEEDED",
+          "execution_seconds": 115,
+          "dpu_seconds": 230.0
+        }
+      ],
+      "glue_dpu_seconds": 558.5,
+      "glue_cost_usd": 0.068261
+    },
+    {
+      "name": "e2317524-bd16-2871-5c7a-68e5fb502046_cd9bf67b-b997-38e0-b166-21b4ce1989c3",
+      "start": "2026-11-14T18:00:16.196000+00:00",
+      "total_seconds": 540.393,
+      "stages": {
+        "Ingest": 119.398,
+        "BronzeToSilver": 177.466,
+        "SilverToGold": 182.452,
+        "Crawl": 60.661
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_2de726332fcd96925685706508ce1bf98b89e57c15da4b158de98c32fc7346a1",
+          "state": "SUCCEEDED",
+          "execution_seconds": 58,
+          "dpu_seconds": 3.625
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_9201ec9c20b5132640ea26e39cb5bb40db5ee74a7957b68831ed454436c995f7",
+          "state": "SUCCEEDED",
+          "execution_seconds": 132,
+          "dpu_seconds": 264.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_20cb0050dc914379a3ddb28047317940d5090dd3e3f21ce17510b7901577603d",
+          "state": "SUCCEEDED",
+          "execution_seconds": 123,
+          "dpu_seconds": 246.0
+        }
+      ],
+      "glue_dpu_seconds": 513.625,
+      "glue_cost_usd": 0.062776
+    }
+  ],
+  "latest": {
+    "snapshot_date": "2026-11-20",
+    "run_id": "55849327-3fe7-658d-a254-0da2ec2f0d60_28b76f25-6af3-dd7c-cbe2-efc11d2fe18c",
+    "bronze_rows": 8099,
+    "successful_boards": 35,
+    "boards": 36,
+    "silver_rows": 43540,
+    "gold_rows": 8505,
+    "dashboard_scan_bytes": 1061129,
+    "dashboard_query_id": "4c8431be-9cd9-4dae-bf77-0d5d83c77798"
+  },
+  "billed": {
+    "2026-11-14": {
+      "APS1-Crawler-DPU-Hour": 0.0513,
+      "APS1-ETL-DPU-Hour": 0.0633
+    },
+    "2026-11-15": {
+      "APS1-Crawler-DPU-Hour": 0.0488,
+      "APS1-ETL-DPU-Hour": 0.0689
+    },
+    "2026-11-16": {
+      "APS1-Crawler-DPU-Hour": 0.0518,
+      "APS1-ETL-DPU-Hour": 0.0716
+    },
+    "2026-11-17": {
+      "APS1-Crawler-DPU-Hour": 0.0488,
+      "APS1-ETL-DPU-Hour": 0.0584
+    },
+    "2026-11-18": {
+      "APS1-Crawler-DPU-Hour": 0.0523,
+      "APS1-ETL-DPU-Hour": 0.0591
+    },
+    "2026-11-19": {
+      "APS1-Crawler-DPU-Hour": 0.0494,
+      "APS1-ETL-DPU-Hour": 0.0635
+    },
+    "2026-11-20": {
+      "APS1-Crawler-DPU-Hour": 0.0494,
+      "APS1-ETL-DPU-Hour": 0.0661
+    }
+  }
+}
