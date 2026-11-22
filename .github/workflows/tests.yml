@@ -31,6 +31,16 @@ jobs:
       - name: Install test deps
         run: pip install -r requirements-dev.txt
 
+      # Real Apache Iceberg for tests/test_iceberg_write.py (in-memory catalog, no AWS).
+      - name: Fetch Iceberg Spark runtime (checksum-verified)
+        env:
+          JAR_URL: https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.5.2/iceberg-spark-runtime-3.5_2.12-1.5.2.jar
+          JAR_SHA1: ba9ae8affd5fb7e5e13f697599dc6750fab33a24
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/iceberg.jar" "$JAR_URL"
+          echo "$JAR_SHA1  $RUNNER_TEMP/iceberg.jar" | sha1sum -c -
+          echo "ICEBERG_SPARK_JAR=$RUNNER_TEMP/iceberg.jar" >> "$GITHUB_ENV"
+
       - name: Lint (ruff, config in pyproject.toml)
         run: ruff check .
 

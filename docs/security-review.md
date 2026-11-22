@@ -11,7 +11,7 @@ runtime roles can write the completion marker. Administrative identities remain 
 | --- | --- | --- |
 | Ingestion | Own script/config, ingestion manifests | Put Bronze/manifests, scoped Glue logs; no object delete |
 | Silver | Bronze, manifests, previous Silver, Silver pointer; its script/shared contract | Put/Delete Silver runs and quality output; Put Silver pointer; own temp prefix |
-| Gold | Silver runs, Silver pointer, manifests; its script/shared contract | Put/Delete only three Gold mart prefixes and their exact directory markers; own temp prefix |
+| Gold | Silver runs, Silver pointer, manifests; its script/shared contract | Put/Delete only three Gold mart prefixes and their exact directory markers; own temp prefix. Shadow Iceberg (5.1): Put/Delete `gold_iceberg/*`, Put `state/gold_iceberg/*`, Get/Create/Update tables only in the `_iceberg` database |
 | Crawler | Gold objects and intended Gold Catalog metadata | Create/update tables/partitions in the Gold database; logs; no S3 write/delete |
 | Step Functions | Job/crawler status | Control three jobs/one crawler, Put/Delete only the pipeline lock key, Put completion marker |
 | Daily EventBridge | No lake data | Start this state machine only |

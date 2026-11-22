@@ -28,6 +28,11 @@ output "gold_database" {
   value       = aws_glue_catalog_database.gold.name
 }
 
+output "gold_iceberg_database" {
+  description = "Glue Data Catalog database for the shadow Iceberg Gold marts (task 5.1 phase A)."
+  value       = aws_glue_catalog_database.gold_iceberg.name
+}
+
 output "bronze_to_silver_job" {
   description = "Glue job name (Bronze -> Silver)."
   value       = aws_glue_job.bronze_to_silver.name

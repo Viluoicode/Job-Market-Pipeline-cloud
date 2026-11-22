@@ -153,6 +153,17 @@ crawl belonging to the current execution before `state/pipeline/latest.json` is 
 must validate matching Silver and pipeline run IDs plus wall-clock freshness before treating the
 latest partition as complete.
 
+**Iceberg migration (in progress, phase A: shadow).** The Gold job also writes the three marts to
+Apache Iceberg tables in the `<gold database>_iceberg` database under `s3://<lake>/gold_iceberg/`.
+Each table commit is atomic and replaces exactly one `snapshot_date` (also when the mart is empty),
+so a reader sees the previous or the new snapshot, never a half-written day; schema comes from code,
+not a crawler. Parquet remains the published contract: an Iceberg failure is recorded in
+`state/gold_iceberg/run_id=<run>.json` and does not fail the run. `scripts/compare_iceberg.py`
+checks row counts of all three marts and row-level equality of the fact table. Phase B, after
+several matching days, moves the dashboard to Iceberg, records each table's snapshot id in the
+completion marker so the three marts are read at one consistent version (Iceberg is atomic per
+table, not across tables), and removes the crawler.
+
 The date boundary is UTC. For example, a run at 01:00 on 17 September in UTC+7 starts at 18:00 on
 16 September UTC and therefore publishes `snapshot_date=2026-09-16`.
 
@@ -235,6 +246,8 @@ reviewed before setting one. Nonempty bucket destruction is opt-in via allow_buc
 - **Athena instead of Redshift:** current SQL volume does not justify a dedicated warehouse.
 - **Step Functions instead of MWAA:** this AWS batch workflow does not currently justify
   operating an Airflow environment.
+- **Iceberg behind a shadow phase:** the table format changes how every reader sees Gold, so both
+  formats run side by side and are compared before readers switch; rollback is a no-op.
 - **Separate health monitor:** successful orchestration alone does not prove fresh, internally
   consistent, or sufficiently covered data.
 
@@ -257,7 +270,8 @@ reviewed before setting one. Nonempty bucket destruction is opt-in via allow_buc
 ## Known limitations
 
 - Arbeitnow pagination is capped at two pages and is marked incomplete when more pages exist.
-- Gold marts are not committed through a single storage transaction.
+- Gold marts are not committed through a single storage transaction. Iceberg (phase A) makes each
+  table commit atomic; cross-mart consistency comes in phase B through recorded snapshot ids.
 - Role classification uses title rules rather than a trained semantic classifier.
 - Remote status depends on source metadata quality.
 - Lifecycle history from the current method begins with the September 2026 migration; earlier

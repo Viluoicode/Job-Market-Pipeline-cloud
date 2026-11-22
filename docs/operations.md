@@ -75,6 +75,18 @@ English: verify the enabled rule, today's execution and trigger input, the compl
 matching ingestion manifest, then refresh the dashboard. A list of S3 buckets alone proves none
 of these. 01:00 on 28 September in Vietnam corresponds to snapshot 27 September UTC.
 
+**Iceberg shadow phase (task 5.1 A).** After a scheduled run, compare the published Parquet marts
+with the shadow Iceberg copy. Exit code 0 means `MATCH`; keep the dated JSON as evidence. A shadow
+failure never blocks publication: read `state/gold_iceberg/run_id=<run>.json` for the failed table
+and error, fix it, and let the next run retry.
+
+```powershell
+python scripts/compare_iceberg.py --output docs/evidence/iceberg-parity-<yyyymmdd>.json
+```
+
+Giai đoạn A: Parquet vẫn là dữ liệu chính thức. Chỉ chuyển dashboard sang Iceberg khi nhiều ngày
+liên tiếp đều `MATCH`.
+
 ## Dashboard troubleshooting / Mở giao diện và xử lý lỗi
 
 Use [README startup commands](../README.md#run-the-dashboard). Opening a dashboard is independent
@@ -158,6 +170,8 @@ terraform -chdir=infra plan -destroy -out=cleanup.tfplan
 terraform -chdir=infra apply cleanup.tfplan
 ```
 
+   The shadow Iceberg tables are created by the Gold job, not by Terraform; destroying the
+   `_iceberg` Glue database removes them, and their files live under `gold_iceberg/` in the lake.
 5. Verify stack resources are gone. Review residual Glue-created log groups, artifacts and resources
    created manually outside Terraform; remove only those owned by this lab after retaining evidence.
 6. Stop the local Streamlit process, remove local downloaded data if no longer needed, and check
