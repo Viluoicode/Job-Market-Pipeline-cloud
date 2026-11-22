@@ -27,8 +27,8 @@
   },
   "recent_executions": [
     {
-      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
-      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "executionArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
       "name": "71e81eeb-028c-f788-745d-43979af072c8_3e3e6416-16f3-4620-524d-35cd158e6d29",
       "status": "SUCCEEDED",
       "startDate": "2026-09-28 01:00:16.277000+07:00",
@@ -36,8 +36,8 @@
       "redriveCount": 0
     },
     {
-      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:c068bf88-69cf-35e2-9740-3f092825e473_f6b0db03-8779-f462-5bf0-db4f9cda4bdb",
-      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "executionArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:c068bf88-69cf-35e2-9740-3f092825e473_f6b0db03-8779-f462-5bf0-db4f9cda4bdb",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
       "name": "c068bf88-69cf-35e2-9740-3f092825e473_f6b0db03-8779-f462-5bf0-db4f9cda4bdb",
       "status": "SUCCEEDED",
       "startDate": "2026-09-27 01:00:16.191000+07:00",
@@ -45,8 +45,8 @@
       "redriveCount": 0
     },
     {
-      "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:3a8c3535-ca9f-cb29-91c5-8abb75352ec0_e6cf3043-69c2-9eee-3900-c8e5ea673328",
-      "stateMachineArn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+      "executionArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:3a8c3535-ca9f-cb29-91c5-8abb75352ec0_e6cf3043-69c2-9eee-3900-c8e5ea673328",
+      "stateMachineArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
       "name": "3a8c3535-ca9f-cb29-91c5-8abb75352ec0_e6cf3043-69c2-9eee-3900-c8e5ea673328",
       "status": "SUCCEEDED",
       "startDate": "2026-09-26 01:00:16.203000+07:00",

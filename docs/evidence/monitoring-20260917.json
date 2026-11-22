@@ -83,7 +83,7 @@
   "monitor_targets": [
     {
       "Id": "terraform-20260917025455032800000001",
-      "Arn": "arn:aws:lambda:ap-southeast-1:290488660407:function:jobmarket-aws-health-monitor"
+      "Arn": "arn:aws:lambda:ap-southeast-1:REDACTED_ACCOUNT_ID:function:jobmarket-aws-health-monitor"
     }
   ],
   "email_subscriptions": [
@@ -92,7 +92,7 @@
       "confirmed": false
     }
   ],
-  "sns_topic_arn": "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts",
+  "sns_topic_arn": "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts",
   "alarms": [
     {
       "AlarmName": "jobmarket-aws-pipeline-aborted",
@@ -104,7 +104,7 @@
       "DatapointsToAlarm": null,
       "TreatMissingData": "notBreaching",
       "AlarmActions": [
-        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+        "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts"
       ]
     },
     {
@@ -117,7 +117,7 @@
       "DatapointsToAlarm": null,
       "TreatMissingData": "notBreaching",
       "AlarmActions": [
-        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+        "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts"
       ]
     },
     {
@@ -130,7 +130,7 @@
       "DatapointsToAlarm": null,
       "TreatMissingData": "notBreaching",
       "AlarmActions": [
-        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+        "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts"
       ]
     },
     {
@@ -143,7 +143,7 @@
       "DatapointsToAlarm": 2,
       "TreatMissingData": "breaching",
       "AlarmActions": [
-        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+        "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts"
       ]
     },
     {
@@ -156,7 +156,7 @@
       "DatapointsToAlarm": 2,
       "TreatMissingData": "notBreaching",
       "AlarmActions": [
-        "arn:aws:sns:ap-southeast-1:290488660407:jobmarket-aws-pipeline-alerts"
+        "arn:aws:sns:ap-southeast-1:REDACTED_ACCOUNT_ID:jobmarket-aws-pipeline-alerts"
       ]
     }
   ],
