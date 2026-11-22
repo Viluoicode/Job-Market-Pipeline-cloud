@@ -53,11 +53,11 @@ Kết quả mong đợi: từng stage thành công, manifest và state pointers 
 
 ## 5. Dashboard đọc AWS / Run the dashboard
 
-Follow [Run the dashboard in README](../README.md#run-the-dashboard) for the canonical
+Follow [Open the dashboard in operations.md](operations.md#open-the-dashboard--mở-dashboard) for the canonical
 one-time setup and per-terminal commands. Reuse your existing environment or create `.venv`.
 The dashboard does not require Java or a local Spark runtime.
 
-**VI:** Mở PowerShell tại root repo → xác thực AWS → đặt sáu biến môi trường theo README →
+**VI:** Mở PowerShell tại root repo → xác thực AWS → đặt sáu biến môi trường theo operations.md →
 chạy Streamlit → mở **http://localhost:8501** → bấm **Refresh data**. Giữ terminal mở;
 `Ctrl+C` chỉ dừng giao diện, lịch AWS vẫn chạy. Không cần deploy lại để xem dữ liệu.
 
@@ -159,10 +159,13 @@ resources and the separate runtime roles, not an unimplemented target design.
 - [x] Security acceptance and same-day overwrite recovery documented (30 September).
 - [x] Next scheduled execution and live dashboard checked (1 October); see
   [evidence](evidence/handoff-check-20261001.json). This is a dated observation, not a live guarantee.
-- [x] Four PNG screenshots exist under `docs/screenshots/`.
-- [ ] Add and personally verify the AWS-icon diagram as described above.
-- [ ] Review screenshots at readable size; capture UTC date/freshness, label their snapshot,
-  then embed overview/postings in README and filtered/verification in the lab/report.
+- [x] Four PNG screenshots exist under `docs/screenshots/` (retaken 22 Nov 2026, snapshot 21 Nov UTC).
+- [x] AWS-icon diagram added: `docs/diagrams/architecture.drawio` and `architecture.png`, embedded in
+  README and `docs/architecture.md` (22 Nov 2026).
+- [ ] Personally verify the diagram against the deployment as described above.
+- [x] Screenshots reviewed at readable size with the UTC snapshot visible; overview and postings
+  are embedded in README.
+- [ ] Embed filtered/verification in the lab/report.
 - [ ] Supply demo video/link, saved Pricing Calculator estimate and bilingual report website
   for the workshop submission. Existing repo checks do not certify the entire program rubric.
 - [ ] Review `git diff --check`, `git diff --stat`, `git status --short`, then stage chosen project

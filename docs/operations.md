@@ -87,9 +87,63 @@ python scripts/compare_iceberg.py --output docs/evidence/iceberg-parity-<yyyymmd
 Giai đoạn A: Parquet vẫn là dữ liệu chính thức. Chỉ chuyển dashboard sang Iceberg khi nhiều ngày
 liên tiếp đều `MATCH`.
 
+## Open the dashboard / Mở dashboard
+
+There are three separate actions:
+
+| Action | Where it runs | When you need it |
+| --- | --- | --- |
+| Deploy with Terraform | Creates/updates AWS resources | First setup or reviewed infrastructure/code changes |
+| Run the pipeline | AWS: EventBridge → Step Functions → Glue | Automatically at 01:00 UTC+7; optional manual full execution |
+| Open the dashboard | Your computer; reads published AWS data | Whenever you want to inspect results |
+
+**VI:** Stack hiện tại đã deploy và bật lịch. Để xem dữ liệu, chỉ mở dashboard; không cần
+`terraform apply` hay chạy lại Glue. Tắt máy không dừng lịch AWS. Dashboard không crawl dữ liệu.
+
+Run PowerShell from the repository root (the folder containing this README, `infra/` and `dashboard/`).
+Use an authenticated AWS profile authorized to assume the configured dashboard reader.
+
+One-time local setup (reuse an existing suitable environment if you have one):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r dashboard/requirements.txt
+```
+
+Each new terminal session:
+
+```powershell
+# Optional: set AWS_PROFILE to your existing configured profile; otherwise use default.
+# $env:AWS_PROFILE = 'your-profile'
+aws sts get-caller-identity
+$env:AWS_REGION = 'ap-southeast-1'
+$env:LAKE_BUCKET = terraform -chdir=infra output -raw lake_bucket
+$env:PIPELINE_LOCK_TABLE = terraform -chdir=infra output -raw pipeline_lock_table
+$env:ATHENA_DATABASE = terraform -chdir=infra output -raw gold_database
+$env:ATHENA_WORKGROUP = terraform -chdir=infra output -raw athena_workgroup
+$env:AWS_DASHBOARD_ROLE_ARN = terraform -chdir=infra output -raw dashboard_reader_role_arn
+.\.venv\Scripts\python.exe -m streamlit run dashboard/app.py --server.address 127.0.0.1
+```
+
+Open **http://localhost:8501** and press **Refresh data**. Keep the terminal running; `Ctrl+C`
+stops only the dashboard. Repeat the environment-variable block after opening a new terminal.
+No Java/Spark installation is needed just to view the dashboard.
+
+These `terraform output` commands read the existing deployment state from S3; they do not deploy anything.
+On a new machine run `terraform -chdir=infra init -backend-config=backend.hcl` once first
+(see [remote state](#remote-state--state-trên-s3-one-time)). A fresh clone has no AWS credentials. If outputs are unavailable, obtain
+these six settings from the existing deployment's operator; do not create another stack just to view it.
+If reusing a different venv, substitute its Python executable consistently in both commands.
+
+The reader role must trust your authenticated principal. Missing credentials or an AssumeRole denial
+must be resolved through that profile/trust configuration, not by removing the reader restriction.
+The page blocks stale or in-progress publication. An idle page does not refresh automatically.
+See [daily checks](#daily-check--kiểm-tra-mỗi-ngày) and [troubleshooting](#dashboard-troubleshooting--mở-giao-diện-và-xử-lý-lỗi) and [the lab guide](workshop.md)
+for new deployments, manual runs, monitoring and cleanup.
+
 ## Dashboard troubleshooting / Mở giao diện và xử lý lỗi
 
-Use [README startup commands](../README.md#run-the-dashboard). Opening a dashboard is independent
+Use the [startup commands above](#open-the-dashboard--mở-dashboard). Opening a dashboard is independent
 of deploying resources or starting a pipeline execution.
 
 | Symptom | Check / Cách xử lý |

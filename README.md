@@ -1,88 +1,79 @@
 # Job Market AWS Pipeline
 
-**An AWS data engineering workshop: public APIs → a traceable data lake → a queryable dashboard.**
+[![tests](https://github.com/Viluoicode/Job-Market-Pipeline-cloud/actions/workflows/tests.yml/badge.svg)](https://github.com/Viluoicode/Job-Market-Pipeline-cloud/actions/workflows/tests.yml)
+[![terraform](https://github.com/Viluoicode/Job-Market-Pipeline-cloud/actions/workflows/terraform.yml/badge.svg)](https://github.com/Viluoicode/Job-Market-Pipeline-cloud/actions/workflows/terraform.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Dự án thực hành pipeline dữ liệu tự động trên AWS: thu thập tin tuyển dụng, chuẩn hóa, theo dõi
-vòng đời, kiểm tra độ mới và hiển thị kết quả có thể kiểm chứng. Phạm vi là một mẫu nguồn quốc tế;
-không phát triển thành sản phẩm tìm việc cá nhân hay mở rộng crawl thị trường Việt Nam.
+**A serverless AWS data pipeline that collects public job postings every night, tracks each
+posting from first sighting to closure, gates every run on data quality, and publishes
+Athena-ready analytics tables. All infrastructure is Terraform, and it runs without a laptop.**
 
-[Lab guide / Thực hành](docs/workshop.md) · [Architecture](docs/architecture.md) ·
-[Verified results](docs/sample_results.md) · [Documentation map](docs/README.md)
+It reads 36 company job boards through four public APIs (Greenhouse, Lever, Ashby, Arbeitnow),
+lands raw JSON in an S3 medallion lake, reconciles each posting's lifecycle with Spark, and serves
+the result through Athena to a read-only Streamlit dashboard.
 
-## Problem and outcome
+> Dự án thực hành Data Engineering trên AWS. Hướng dẫn thực hành song ngữ: [docs/workshop.md](docs/workshop.md).
 
-Public job APIs use different schemas and change over time. A successful script alone cannot tell
-whether a posting is current, duplicated, missing because of a source failure, or actually closed.
-This workshop demonstrates a repeatable daily workflow with observation timestamps, lifecycle,
-quality gates, publication checks and independent monitoring.
+## At a glance
 
-The result is an inspectable dataset and a simple analytics interface for the **configured sample**.
-It does not claim representative market coverage, personal job suitability or employer availability.
-See the [proposal](docs/proposal.md) for the bounded problem statement.
+| Area | Result |
+| --- | --- |
+| Reliability | 68 of 68 scheduled nightly runs succeeded, 15 Sep – 21 Nov 2026 (UTC) |
+| Latest snapshot | 8,672 open postings from 467 employers; 36 of 36 boards collected (21 Nov 2026) |
+| Run time | 9 minutes from trigger to published tables (median, 14–20 Nov) |
+| Cost | About $0.11 per run in AWS Glue before credits; orchestration and monitoring stay in the free tier |
+| Quality gates | 251 tests, ruff, Terraform validation and a Checkov scan on every pull request; 69/69 IAM permission simulations |
 
 ## Architecture
 
-```mermaid
-flowchart LR
-    E[EventBridge daily rule] --> F[Step Functions Standard]
-    F <--> L[DynamoDB writer lock]
-    F -. orchestrates .-> I[Glue Python Shell]
-    A[Public job APIs] --> I
-    I --> B[S3 Bronze + manifest]
-    B --> S[Glue Spark: Silver lifecycle + DQ]
-    S --> G[Glue Spark: Gold marts]
-    G --> O[S3 Gold]
-    F -. verifies .-> C[Glue Crawler]
-    O --> C
-    C --> D[Glue Data Catalog]
-    O --> Q[Athena]
-    D --> Q
-    Q --> UI[Local Streamlit dashboard]
-    F -. publishes .-> P[S3 completion marker]
-    P -. publication check .-> UI
-    M[EventBridge every 15 min] --> H[Lambda health monitor]
-    P --> H
-    H --> CW[CloudWatch alarms]
-    CW --> N[SNS email]
-```
+![AWS architecture](docs/diagrams/architecture.png)
 
-The workflow publishes completion only after ingestion, Silver checks, Gold and the current crawl
-succeed. The dashboard checks the writer lock and matching publication metadata before and after
-reading the published partition. Full data/control paths, security boundaries and trade-offs are
-in [architecture.md](docs/architecture.md).
+1. **EventBridge** starts a **Step Functions** workflow at 01:00 UTC+7. The workflow holds a
+   **DynamoDB** writer lock for the whole run.
+2. A **Glue Python Shell** job calls the job-board APIs, five at a time, writes raw JSON to
+   `bronze/` and then commits a run manifest. Later stages read only the objects it lists.
+3. A **Glue Spark** job builds Silver: it reconciles each posting's lifecycle and stops the run if
+   **Glue Data Quality** rules fail. A second Spark job writes three Gold marts.
+4. A crawler registers the Gold tables. The workflow checks that this run's crawl succeeded before
+   it publishes a completion marker, and **Athena** serves the marts.
+5. A **Lambda** health monitor checks freshness every 15 minutes and alarms through **SNS**. A
+   lock-janitor Lambda frees a lock left behind by an aborted run.
 
-Security hardening was deployed on **30 September 2026**: separate stage roles, a restricted
-dashboard reader, HTTPS-only bucket access and deliberate cleanup controls. See the
-[permission matrix](docs/security-review.md) and [live acceptance](docs/evidence/security-acceptance-20260930.json).
+More: [architecture and invariants](docs/architecture.md) ·
+[editable diagram](docs/diagrams/architecture.drawio) ·
+[permission matrix](docs/security-review.md)
 
-## What is included
+## Key engineering decisions
 
-- Daily ingestion from **36 configured boards** across Greenhouse, Lever, Ashby and Arbeitnow.
-- Bronze observations and manifest; immutable Silver lifecycle state; seven enforced DQ rules.
-- Three Parquet Gold marts: `fact_job_posting`, `demand_by_role`, `role_opportunity`.
-- Terraform-managed scheduling, orchestration, storage, IAM, monitoring and cost controls.
-- One-page dashboard: source/role/location/search filters, posting/company/location counts,
-  remote share, role and company charts, and original posting links.
-- Bilingual lab guide, operational checks, recovery/cleanup steps and dated AWS evidence.
+- **The manifest is the commit point.** Ingestion writes every board's file first and the manifest
+  last, and Silver reads only what the manifest lists. A crash leaves unread files, never a
+  half-visible run. A run that collects zero rows fails instead of publishing an empty market.
+- **Lifecycle reconciliation instead of daily dumps.** A posting closes when a board that answered
+  completely stops listing it. Postings from a failed or truncated board keep their last
+  observation and expire only after seven days unseen, so a source outage never looks like a wave
+  of closures.
+- **One writer, released by evidence.** A conditional DynamoDB lock serializes the workflow, with
+  no TTL that could expire mid-write. A lock-janitor Lambda releases an orphaned lock only after the
+  owning execution has ended and no Glue job or crawl is still running.
+- **Publish only what was verified.** Data-quality rules gate Silver. The completion marker is
+  written only after this run's crawl succeeds. The dashboard checks the lock and the marker before
+  and after it reads, and refuses stale or in-progress data.
+- **Atomic Gold with Apache Iceberg (in progress).** Gold is also written to Iceberg in shadow
+  mode, one atomic commit per table and day, and compared with Parquet each day. Readers switch
+  after several matching days, and the crawler, about 44% of Glue cost per run, goes away.
+- **Least privilege, checked in CI.** Each stage runs under its own IAM role and the dashboard
+  assumes a read-only role. Checkov runs on every pull request, and each of its 38 accepted
+  findings carries a written reason.
 
-## Verified reference run
+## Results
 
-Checked **28 September 2026** in `ap-southeast-1`; these are historical observations, not live status.
+The dashboard reading the published snapshot of 21 November 2026 (UTC):
 
-| Check | Result |
-| --- | --- |
-| Schedule | Enabled, daily at 01:00 UTC+7; runs without the laptop |
-| Latest three executions | SUCCEEDED |
-| Latest UTC snapshot | `2026-09-27` |
-| Ingestion | 7,838 observations; 36 successful boards; 0 failed; 1 incomplete |
-| Gold | 8,157 unique postings; 467 reported companies; 30.4% marked remote |
-| Verification | 67 tests passed; Terraform formatting and validation passed |
+![Dashboard overview: snapshot status, filters, KPIs, postings by role family and top employers](docs/screenshots/dashboard-overview.png)
 
-[Results and query evidence](docs/sample_results.md) explain why Gold and raw counts differ.
-The 01:00 local run belongs to the previous UTC date. Use the
-[daily runbook](docs/operations.md#daily-check--kiểm-tra-mỗi-ngày) for today's health.
+![Postings table searched for "data engineer", with work mode and links to the original postings](docs/screenshots/dashboard-postings.png)
 
-## Performance and cost
+### Performance and cost
 
 Measured by `scripts/run_metrics.py` over the **7 scheduled runs of 14–20 November 2026**
 (medians; [evidence](docs/evidence/run-metrics-20261121.json)). Baseline before parallel fetching
@@ -103,63 +94,36 @@ the free tier; S3 and DynamoDB added cents per day. Gold can exceed one run's Br
 from a failed or incomplete board keep their last observation while still inside the freshness
 window ([why](docs/sample_results.md), [lifecycle](docs/architecture.md)).
 
-## Run the dashboard
+## Tech stack
 
-There are three separate actions:
+AWS (S3, Glue Python Shell and Spark, Glue Data Quality, Step Functions, EventBridge, DynamoDB,
+Athena, Lambda, CloudWatch, SNS, IAM, Budgets) · Terraform · Python · PySpark · Apache Iceberg ·
+Streamlit · pytest · ruff · Checkov · GitHub Actions
 
-| Action | Where it runs | When you need it |
-| --- | --- | --- |
-| Deploy with Terraform | Creates/updates AWS resources | First setup or reviewed infrastructure/code changes |
-| Run the pipeline | AWS: EventBridge → Step Functions → Glue | Automatically at 01:00 UTC+7; optional manual full execution |
-| Open the dashboard | Your computer; reads published AWS data | Whenever you want to inspect results |
+## Repository layout
 
-**VI:** Stack hiện tại đã deploy và bật lịch. Để xem dữ liệu, chỉ mở dashboard; không cần
-`terraform apply` hay chạy lại Glue. Tắt máy không dừng lịch AWS. Dashboard không crawl dữ liệu.
-
-Run PowerShell from the repository root (the folder containing this README, `infra/` and `dashboard/`).
-Use an authenticated AWS profile authorized to assume the configured dashboard reader.
-
-One-time local setup (reuse an existing suitable environment if you have one):
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r dashboard/requirements.txt
+```text
+ingestion/    Public API connectors, source catalog and run manifest
+glue/jobs/    Silver lifecycle, data quality and Gold transformations (Parquet + Iceberg)
+infra/        Terraform: storage, jobs, orchestration, IAM, monitoring, cost controls
+monitoring/   Health monitor and lock janitor Lambdas
+dashboard/    Athena reader, publication checks and Streamlit page
+scripts/      Freshness, permission, run-metrics and Iceberg parity checks
+sql/          Athena inspection and analysis queries
+tests/        Spark, ingestion, contract, dashboard, Lambda and Iceberg tests
+docs/         Architecture, runbooks, lab guide, costs and dated evidence
 ```
 
-Each new terminal session:
+## Run and develop
 
-```powershell
-# Optional: set AWS_PROFILE to your existing configured profile; otherwise use default.
-# $env:AWS_PROFILE = 'your-profile'
-aws sts get-caller-identity
-$env:AWS_REGION = 'ap-southeast-1'
-$env:LAKE_BUCKET = terraform -chdir=infra output -raw lake_bucket
-$env:PIPELINE_LOCK_TABLE = terraform -chdir=infra output -raw pipeline_lock_table
-$env:ATHENA_DATABASE = terraform -chdir=infra output -raw gold_database
-$env:ATHENA_WORKGROUP = terraform -chdir=infra output -raw athena_workgroup
-$env:AWS_DASHBOARD_ROLE_ARN = terraform -chdir=infra output -raw dashboard_reader_role_arn
-.\.venv\Scripts\python.exe -m streamlit run dashboard/app.py --server.address 127.0.0.1
-```
+The stack is deployed and runs on its own; viewing results needs no deploy.
 
-Open **http://localhost:8501** and press **Refresh data**. Keep the terminal running; `Ctrl+C`
-stops only the dashboard. Repeat the environment-variable block after opening a new terminal.
-No Java/Spark installation is needed just to view the dashboard.
+- Open the dashboard: [operations.md → Open the dashboard](docs/operations.md#open-the-dashboard--mở-dashboard)
+- Deploy a copy, daily checks, recovery, pause and cleanup: [operations.md](docs/operations.md)
+- Guided lab in Vietnamese and English: [workshop.md](docs/workshop.md)
+- Every document and what it covers: [documentation map](docs/README.md)
 
-These `terraform output` commands read the existing deployment state from S3; they do not deploy anything.
-On a new machine run `terraform -chdir=infra init -backend-config=backend.hcl` once first
-(see [remote state](docs/operations.md#remote-state--state-trên-s3-one-time)). A fresh clone has no AWS credentials. If outputs are unavailable, obtain
-these six settings from the existing deployment's operator; do not create another stack just to view it.
-If reusing a different venv, substitute its Python executable consistently in both commands.
-
-The reader role must trust your authenticated principal. Missing credentials or an AssumeRole denial
-must be resolved through that profile/trust configuration, not by removing the reader restriction.
-The page blocks stale or in-progress publication. An idle page does not refresh automatically.
-See [daily checks and troubleshooting](docs/operations.md) and [the lab guide](docs/workshop.md)
-for new deployments, manual runs, monitoring and cleanup.
-
-## Develop and test
-
-Use **Python 3.11 and Java 17** for the local Spark suite.
+Local checks use Python 3.11, plus Java 17 for the Spark tests:
 
 ```powershell
 python -m pip install -r requirements-dev.txt
@@ -170,31 +134,20 @@ terraform -chdir=infra fmt -check -recursive
 terraform -chdir=infra validate
 ```
 
-Tests mock source APIs and AWS clients; local success does not substitute for deployment evidence.
+Tests mock the source APIs and AWS clients; dated AWS evidence lives in [docs/evidence](docs/evidence/README.md).
 
-```text
-ingestion/    Public API connectors, source catalog and manifest
-glue/jobs/    Silver lifecycle, data quality and Gold transformations
-infra/        Terraform infrastructure and script uploads
-monitoring/   Independent AWS publication-health monitor
-dashboard/    Athena reader, display semantics and Streamlit page
-scripts/      Operational checks
-sql/          Athena inspection and analysis
-tests/        Pipeline and dashboard contract tests
-docs/         Lab, architecture, runbooks, costs and evidence
-```
+## Limits
 
-## Limits and cost
-
-This is a bounded workshop, not a hardened multi-user production service. Arbeitnow pagination is
-capped; role families are title-based heuristics (one family per posting); missing remote metadata does not mean onsite. Gold publication
-is not an atomic transaction across marts. Stage-specific roles, an assumed dashboard reader, HTTPS bucket policies and versioning are
-managed by Terraform. See the [security review](docs/security-review.md) for remaining boundaries. See [metric definitions](docs/data-dictionary.md).
-
-Daily Glue and supporting AWS services incur charges even when credits offset them. Budget alerts
-do not cap spending. Read [cost assumptions and security](docs/cost-and-security.md) and
-[cleanup instructions](docs/operations.md#cleanup--kết-thúc-lab) before deployment or retirement.
-Destroying this stack can delete retained data.
+- A fixed sample of 36 public boards from large employers plus one aggregator. It is not the whole
+  job market and not specific to Vietnam.
+- Role families come from job-title rules, one family per posting. Work mode depends on what each
+  source states, and about 45% of postings state none; those are reported as "not stated".
+- Arbeitnow is read two pages deep and flagged as incomplete.
+- Until readers switch to Iceberg, the three Gold marts are not committed in one transaction;
+  the publication checks guard the reader instead.
+- Glue and supporting services cost money even when credits cover them, and budget alerts do not
+  cap spending. Read [cost and security](docs/cost-and-security.md) and
+  [cleanup](docs/operations.md#cleanup--kết-thúc-lab) before deploying or retiring a copy.
 
 ## License
 
