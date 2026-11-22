@@ -28,8 +28,10 @@ remaining scope choices, not claims of per-object/per-run isolation.
 All three buckets enforce an insecure-transport Deny for non-service principals, have all public
 access blocks enabled, and BucketOwnerEnforced ownership managed in Terraform. Lake versioning
 was adopted without suspending it; scripts versioning is now enabled. Default SSE-S3 stays enabled.
-No noncurrent versions were deleted or assigned a new expiration during this change. Old versions
-continue to consume storage until an explicit recovery/retention policy is agreed.
+No noncurrent versions were deleted or assigned a new expiration during this change. Follow-up,
+22 November 2026: the agreed retention is 30 days for noncurrent versions on the lake and scripts
+buckets, and 30 days for the shared `/aws-glue/*` log groups (imported into Terraform with
+`skip_destroy`, so destroying this stack leaves them in place).
 
 `allow_bucket_force_destroy` now defaults to false. Cleanup must deliberately opt in before deleting
 nonempty buckets. This protects the Terraform cleanup path, not deletion by a privileged IAM user.
