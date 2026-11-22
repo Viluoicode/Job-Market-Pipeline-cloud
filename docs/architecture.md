@@ -1,5 +1,10 @@
 # System architecture
 
+![AWS architecture](diagrams/architecture.png)
+
+[Editable diagram](diagrams/architecture.drawio) (draw.io). The text diagram under
+[Container and data flow](#container-and-data-flow) shows the same paths.
+
 This document describes the current design and its invariants. Deployment commands and incident
 procedures belong in [operations.md](operations.md); monitoring thresholds and alarm response
 belong in [monitoring.md](monitoring.md).
