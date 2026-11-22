@@ -52,7 +52,8 @@ ownership and lake/scripts versioning. Never commit state, credentials or real t
 The operator still has administrative access for deployment. IAM simulations and live acceptance
 are scoped checks, not production certification. See [security-review](security-review.md).
 Versioning preserves old versions: current-object expiration alone does not bound all storage.
-No new noncurrent-version expiry has been enabled; account for retained versions in cost estimates.
+Noncurrent versions expire after 30 days (22 November 2026), which bounds that storage; Glue logs
+keep 30 days and Lambda logs 14 days.
 
 For a dedicated dashboard reader, scope permissions to the specific resources:
 

@@ -72,6 +72,18 @@ resource "aws_s3_bucket_lifecycle_configuration" "lake" {
       days_after_initiation = 7
     }
   }
+  # Versioning keeps overwritten/deleted objects recoverable; keep them N days, then stop paying.
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = var.noncurrent_version_retention_days
+    }
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
 }
 
 # ---- Athena results ------------------------------------------------------------------------
@@ -178,9 +190,21 @@ resource "aws_s3_bucket_lifecycle_configuration" "scripts" {
       days_after_initiation = 7
     }
   }
+  # Versioning keeps overwritten/deleted objects recoverable; keep them N days, then stop paying.
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+    filter {}
+    noncurrent_version_expiration {
+      noncurrent_days = var.noncurrent_version_retention_days
+    }
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
 }
 
-# Preserve existing lake history; do not expire noncurrent versions implicitly.
+# Versioned buckets: noncurrent versions expire after var.noncurrent_version_retention_days (see lifecycle).
 resource "aws_s3_bucket_versioning" "lake" {
   bucket = aws_s3_bucket.lake.id
   versioning_configuration { status = "Enabled" }

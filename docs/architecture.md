@@ -230,10 +230,14 @@ See [security-review.md](security-review.md) for the exact read/write matrix and
 | Athena results | 7 days | Query output is reproducible |
 | Glue temporary data | 7 days | Remove abandoned transient data |
 | Silver, Gold, and state | No automatic expiration | Preserve lifecycle and historical analytical state |
+| Overwritten or deleted object versions (lake, scripts) | 30 days | Recover a bad overwrite, then stop paying for it |
+| Incomplete multipart uploads | 7 days | Abandoned upload parts are billed but invisible |
+| Glue and Lambda logs | 30 days (Glue), 14 days (Lambda) | Debug recent runs; evidence lives in S3 |
 
-Current-object expiration is not permanent version deletion on the versioned lake/scripts buckets.
-Noncurrent versions have no automatic expiration yet; storage and recovery requirements must be
-reviewed before setting one. Nonempty bucket destruction is opt-in via allow_bucket_force_destroy.
+Current-object expiration on the versioned lake/scripts buckets creates a noncurrent version; that
+version, and any overwritten one, is deleted 30 days later (`noncurrent_version_retention_days`,
+agreed 22 November 2026), and orphaned delete markers are removed. Nonempty bucket destruction is
+opt-in via allow_bucket_force_destroy.
 
 ## Design decisions and trade-offs
 

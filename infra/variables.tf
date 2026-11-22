@@ -74,6 +74,18 @@ variable "athena_bytes_scanned_cutoff" {
 }
 
 # ---- S3 lifecycle (keep storage near zero) ----
+variable "noncurrent_version_retention_days" {
+  description = "Delete overwritten or deleted object versions in the versioned lake and scripts buckets after N days."
+  type        = number
+  default     = 30
+}
+
+variable "glue_log_retention_days" {
+  description = "Retention for the shared /aws-glue/* CloudWatch log groups."
+  type        = number
+  default     = 30
+}
+
 variable "bronze_expiration_days" {
   description = "Expire raw bronze/ objects after N days."
   type        = number

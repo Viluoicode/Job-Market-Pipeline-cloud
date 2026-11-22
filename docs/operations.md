@@ -10,6 +10,11 @@ Review `infra/terraform.tfvars.example`; keep real emails and account settings o
 For a new deployment only, copy the example to `infra/terraform.tfvars` and edit it.
 Do not overwrite an existing deployment's tfvars or state.
 
+Terraform sets a 30-day retention on Glue's shared `/aws-glue/*` log groups (`infra/logs.tf`). In an
+account where Glue has already run, those groups exist: adopt them once before the first apply with
+a temporary `import { for_each = local.glue_log_groups  to = aws_cloudwatch_log_group.glue[each.key]  id = each.key }`
+block, then delete the block. They carry `skip_destroy`, so a destroy leaves them in place.
+
 ### Remote state / State trên S3 (one-time)
 
 Terraform state lives in an S3 bucket created **by hand, outside this stack**, so destroying the

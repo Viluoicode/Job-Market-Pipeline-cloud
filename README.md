@@ -62,8 +62,8 @@ More: [architecture and invariants](docs/architecture.md) ·
   mode, one atomic commit per table and day, and compared with Parquet each day. Readers switch
   after several matching days, and the crawler, about 44% of Glue cost per run, goes away.
 - **Least privilege, checked in CI.** Each stage runs under its own IAM role and the dashboard
-  assumes a read-only role. Checkov runs on every pull request, and each of its 38 accepted
-  findings carries a written reason.
+  assumes a read-only role. Checkov runs on every pull request with zero open findings; each
+  accepted one carries a written reason next to the resource.
 
 ## Results
 
