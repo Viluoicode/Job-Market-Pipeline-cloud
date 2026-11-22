@@ -27,6 +27,9 @@ import re
 import sys
 import time
 import uuid
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
@@ -283,6 +286,9 @@ def fetch_arbeitnow(client, token, company_hint, max_pages=2, with_completeness=
     return (out, not bool(url)) if with_completeness else out
 
 
+# Concurrent API calls: polite to public job boards, ~5x fewer sequential waits.
+FETCH_WORKERS = 5
+
 CONNECTORS = {
     "greenhouse": fetch_greenhouse,
     "lever": fetch_lever,
@@ -370,24 +376,35 @@ def fetch_board(client, board, arbeitnow_pages):
     return CONNECTORS[source](client, token, board.get("company")), True
 
 
-def ingest_board(client, board, *, run_id, arbeitnow_pages, s3=None, bucket=None, out_dir=None):
-    """Fetch one board and land it in Bronze; return its manifest entry.
+def safe_fetch(client, board, arbeitnow_pages):
+    """Worker-thread step: call the API and RETURN any failure instead of raising it.
+
+    Returns (records, complete, fetched_at, error). Storage never happens here, so a storage
+    error can only come from land_board in the main thread and still aborts the whole run.
+    """
+    try:
+        records, complete = fetch_board(client, board, arbeitnow_pages)
+    except Exception as exc:
+        return None, False, None, exc
+    return records, complete, datetime.now(timezone.utc).isoformat(), None
+
+
+def land_board(board, outcome, *, run_id, s3=None, bucket=None, out_dir=None):
+    """Land one fetched board in Bronze; return its manifest entry.
 
     An API failure only marks this board FAILED. A storage failure propagates and aborts the run:
     it says nothing about the source, and a manifest must never reference an unwritten object.
     """
+    records, complete, fetched_at, error = outcome
     source, token = board["source"].lower().strip(), board["token"]
     entry = {"source": source, "board_token": token, "status": "FAILED", "complete": False, "row_count": 0}
-    try:
-        records, complete = fetch_board(client, board, arbeitnow_pages)
-    except Exception as exc:
-        entry["error_type"] = type(exc).__name__
-        if isinstance(exc, httpx.HTTPStatusError):
-            entry["http_status"] = exc.response.status_code
-        print(f"[ingest] {source}/{token}: FAILED ({type(exc).__name__}, "
+    if error is not None:
+        entry["error_type"] = type(error).__name__
+        if isinstance(error, httpx.HTTPStatusError):
+            entry["http_status"] = error.response.status_code
+        print(f"[ingest] {source}/{token}: FAILED ({type(error).__name__}, "
               f"http_status={entry.get('http_status', 'n/a')})", file=sys.stderr)
         return entry
-    fetched_at = datetime.now(timezone.utc).isoformat()
     for record in records:
         record.update(run_id=run_id, fetched_at=fetched_at)
     key = f"bronze/run_id={run_id}/source={source}/board={quote(token, safe='')}/jobs.json"
@@ -396,6 +413,40 @@ def ingest_board(client, board, *, run_id, arbeitnow_pages, s3=None, bucket=None
     entry.update(status="SUCCEEDED", complete=complete, row_count=len(records), key=key, fetched_at=fetched_at)
     print(f"[ingest] {source}/{token}: {len(records)} postings (complete={complete})")
     return entry
+
+
+def ingest_board(client, board, *, run_id, arbeitnow_pages, s3=None, bucket=None, out_dir=None):
+    """Fetch and land a single board sequentially."""
+    return land_board(board, safe_fetch(client, board, arbeitnow_pages),
+                      run_id=run_id, s3=s3, bucket=bucket, out_dir=out_dir)
+
+
+def fetch_in_order(client, boards, arbeitnow_pages, workers):
+    """Yield (board, outcome) in configured order while up to `workers` API calls run at once.
+
+    Only 2 x workers boards are ever fetched ahead of the consumer. Glue Python Shell has about
+    1 GB of memory and one run's Bronze is ~150 MB of JSON, so outcomes must not pile up behind a
+    slow board. The shared httpx.Client is thread-safe.
+    """
+    upcoming = iter(boards)
+    pending = deque()
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="fetch") as pool:
+        def submit_next():
+            board = next(upcoming, None)
+            if board is not None:
+                pending.append((board, pool.submit(safe_fetch, client, board, arbeitnow_pages)))
+        try:
+            for _ in range(2 * workers):
+                submit_next()
+            while pending:
+                board, future = pending.popleft()
+                outcome = future.result()
+                submit_next()
+                yield board, outcome
+        finally:
+            # Writer aborted (storage error): do not start the boards still queued.
+            for _, future in pending:
+                future.cancel()
 
 
 def finalize_manifest(manifest, n_boards, min_success_ratio):
@@ -412,8 +463,14 @@ def finalize_manifest(manifest, n_boards, min_success_ratio):
 
 def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_dir=None,
                   min_success_ratio=0.8, arbeitnow_pages=2, timeout=20.0, client=None,
-                  execution_started_at=None):
-    """Fetch every board into Bronze, then commit the run manifest (written last)."""
+                  execution_started_at=None, fetch_workers=FETCH_WORKERS):
+    """Fetch every board into Bronze, then commit the run manifest (written last).
+
+    API calls run concurrently; Bronze writes and the manifest stay sequential in configured board
+    order, so the manifest is deterministic and a storage error still aborts the run.
+    """
+    if fetch_workers < 1:
+        raise ValueError("fetch_workers must be at least 1")
     started, execution_start = resolve_run_clock(
         run_id, snapshot_date, execution_started_at, boards=boards,
         min_success_ratio=min_success_ratio, arbeitnow_pages=arbeitnow_pages, timeout=timeout)
@@ -432,11 +489,11 @@ def run_ingestion(boards, *, run_id, snapshot_date, s3=None, bucket=None, out_di
     client = client or httpx.Client(timeout=timeout, follow_redirects=True,
                                    headers={"User-Agent": "jobmarket-aws-pipeline/2.0 (+portfolio)"})
     try:
-        for board in boards:
-            entry = ingest_board(client, board, run_id=run_id, arbeitnow_pages=arbeitnow_pages,
-                                 s3=s3, bucket=bucket, out_dir=out_dir)
-            manifest["boards"].append(entry)
-            manifest["total_records"] += entry["row_count"]
+        with closing(fetch_in_order(client, boards, arbeitnow_pages, fetch_workers)) as fetched:
+            for board, outcome in fetched:
+                entry = land_board(board, outcome, run_id=run_id, s3=s3, bucket=bucket, out_dir=out_dir)
+                manifest["boards"].append(entry)
+                manifest["total_records"] += entry["row_count"]
     finally:
         if owned_client:
             client.close()

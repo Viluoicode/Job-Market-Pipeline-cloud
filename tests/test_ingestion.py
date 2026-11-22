@@ -1,6 +1,8 @@
 """Exercise API failures, completeness and the manifest commit boundary without AWS."""
 import json
 import re
+import threading
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -236,3 +238,54 @@ def test_ashby_board_token_with_dot_round_trips(tmp_path):
     record = json.loads((tmp_path / keys[0]).read_text())
     assert record["board_token"] == "mistral.ai" and record["company"] == "Mistral AI"
     assert record["remote"] is False          # Hybrid is not remote
+
+
+def _concurrency_probe(delay_for):
+    """MockTransport handler that records how many requests are in flight at once."""
+    state = {"active": 0, "peak": 0, "started": []}
+    lock = threading.Lock()
+
+    def handler(req):
+        token = req.url.path.split("/")[3]
+        with lock:
+            state["active"] += 1
+            state["peak"] = max(state["peak"], state["active"])
+            state["started"].append(token)
+        time.sleep(delay_for(token))
+        with lock:
+            state["active"] -= 1
+        return httpx.Response(200, json={"jobs": [{"id": token}]})
+    return state, handler
+
+
+def test_boards_are_fetched_concurrently_with_at_most_five_requests(tmp_path):
+    state, handler = _concurrency_probe(lambda token: 0.05)
+    manifest = run(tmp_path, [board(f"b{i}") for i in range(12)], handler)
+    assert manifest["status"] == "SUCCEEDED"
+    assert 1 < state["peak"] <= 5
+
+
+def test_manifest_keeps_configured_board_order_when_fetches_finish_out_of_order(tmp_path):
+    # The first board is the slowest; every other board finishes before it.
+    state, handler = _concurrency_probe(lambda token: 0.3 if token == "b0" else 0.01)
+    manifest = run(tmp_path, [board(f"b{i}") for i in range(8)], handler)
+    assert [b["board_token"] for b in manifest["boards"]] == [f"b{i}" for i in range(8)]
+    assert state["started"][0] == "b0"
+
+
+def test_fetch_window_bounds_boards_held_in_memory(tmp_path):
+    # While the first board is still in flight, at most 2 x 5 boards may be fetched ahead of
+    # the writer, so a slow board cannot make the whole run's payloads accumulate in memory.
+    seen_while_first_pending = []
+    state, handler = _concurrency_probe(lambda token: 0.5 if token == "b0" else 0.0)
+
+    def watching(req):
+        if req.url.path.split("/")[3] == "b0":
+            response = handler(req)
+            seen_while_first_pending.append(len(state["started"]))
+            return response
+        return handler(req)
+
+    manifest = run(tmp_path, [board(f"b{i}") for i in range(30)], watching)
+    assert manifest["successful_boards"] == 30
+    assert seen_while_first_pending == [10]

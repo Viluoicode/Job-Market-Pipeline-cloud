@@ -173,6 +173,9 @@ source sample and must not be presented as the whole labor market.
 - A conditional DynamoDB lock prevents overlapping writers.
 - Each Glue job also has a concurrency limit.
 - Network errors, HTTP 429, and transient 5xx responses are retried with backoff.
+- Up to five board APIs are called concurrently; Bronze writes and the manifest stay sequential in
+  configured board order. At most ten boards are fetched ahead of the writer, which bounds memory
+  in the ~1 GB Python Shell, and a storage error still aborts the run.
 - A committed ingestion run can be read again without changing its observation time.
 - Silver state advances only after validation, data quality, and Parquet output succeed.
 - The crawler is verified by status and start time, not merely by returning to `READY`.
