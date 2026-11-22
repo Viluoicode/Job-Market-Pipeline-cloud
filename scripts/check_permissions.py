@@ -64,6 +64,14 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         check("gold", "s3:PutObject", obj(lake, "gold/" + mart + "_$folder$"), True)
     check("gold", "s3:PutObject", obj(lake, "gold/other_$folder$"), False)
     check("silver", "s3:PutObject", obj(lake, "state/silver/latest.json"), True)
+    # Shadow Iceberg Gold (task 5.1 phase A): only the Gold job writes it and its outcome record.
+    iceberg_db = f"{database}_iceberg"
+    check("gold", "s3:PutObject", obj(lake, "gold_iceberg/fact_job_posting/data/x.parquet"), True)
+    check("gold", "s3:PutObject", obj(lake, "state/gold_iceberg/run_id=probe.json"), True)
+    check("gold", "glue:UpdateTable", arn("glue", f"table/{iceberg_db}/fact_job_posting"), True)
+    check("gold", "glue:UpdateTable", arn("glue", f"table/{database}/fact_job_posting"), False)
+    for name in ["silver", "crawler", "ingestion"]:
+        check(name, "s3:PutObject", obj(lake, "gold_iceberg/fact_job_posting/data/x.parquet"), False)
     check("crawler", "s3:GetObject", obj(lake, "gold/fact_job_posting/x.parquet"), True)
     check("crawler", "s3:PutObject", obj(lake, "gold/fact_job_posting/x.parquet"), False)
     check("crawler", "s3:GetObject", obj(lake, "bronze/x.json"), False)

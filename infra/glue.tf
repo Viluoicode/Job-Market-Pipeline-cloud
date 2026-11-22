@@ -7,6 +7,26 @@ resource "aws_glue_catalog_database" "gold" {
   name = var.gold_database_name
 }
 
+# Shadow Iceberg copy of the Gold marts (task 5.1, phase A). Tables are created by the Gold job,
+# so their schema comes from code rather than a crawler. Kept outside gold/ so the Parquet crawler
+# never scans Iceberg data or metadata files.
+resource "aws_glue_catalog_database" "gold_iceberg" {
+  name         = "${var.gold_database_name}_iceberg"
+  location_uri = "s3://${aws_s3_bucket.lake.bucket}/gold_iceberg"
+}
+
+locals {
+  iceberg_warehouse = "s3://${aws_s3_bucket.lake.bucket}/gold_iceberg/"
+  # Glue accepts a single --conf key; the remaining settings are chained with " --conf ".
+  iceberg_spark_conf = join(" --conf ", [
+    "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
+    "spark.sql.catalog.glue_catalog=org.apache.iceberg.spark.SparkCatalog",
+    "spark.sql.catalog.glue_catalog.catalog-impl=org.apache.iceberg.aws.glue.GlueCatalog",
+    "spark.sql.catalog.glue_catalog.io-impl=org.apache.iceberg.aws.s3.S3FileIO",
+    "spark.sql.catalog.glue_catalog.warehouse=${local.iceberg_warehouse}",
+  ])
+}
+
 locals {
   glue_common_args = {
     "--job-language"                     = "python"
@@ -63,8 +83,13 @@ resource "aws_glue_job" "silver_to_gold" {
     python_version  = "3"
   }
 
-  default_arguments = merge(local.glue_common_args, { "--TempDir" = "s3://${aws_s3_bucket.scripts.bucket}/tmp/gold/" })
-  depends_on        = [aws_s3_object.silver_to_gold, aws_iam_role_policy.gold]
+  default_arguments = merge(local.glue_common_args, {
+    "--TempDir"          = "s3://${aws_s3_bucket.scripts.bucket}/tmp/gold/"
+    "--datalake-formats" = "iceberg"
+    "--conf"             = local.iceberg_spark_conf
+    "--iceberg_database" = aws_glue_catalog_database.gold_iceberg.name
+  })
+  depends_on = [aws_s3_object.silver_to_gold, aws_iam_role_policy.gold]
 }
 
 # Crawls s3://<lake>/gold/ and registers fact_job_posting + demand_by_role (one table per

@@ -195,6 +195,37 @@ data "aws_iam_policy_document" "gold" {
     resources = ["arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:job/${var.project}-silver-to-gold"]
   }
   statement {
+    sid = "WriteIcebergShadow"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:AbortMultipartUpload",
+      "s3:ListMultipartUploadParts",
+    ]
+    resources = ["${aws_s3_bucket.lake.arn}/gold_iceberg/*"]
+  }
+  statement {
+    sid       = "RecordIcebergShadowOutcome"
+    actions   = ["s3:PutObject"]
+    resources = ["${aws_s3_bucket.lake.arn}/state/gold_iceberg/*"]
+  }
+  statement {
+    sid = "ManageIcebergTables"
+    actions = [
+      "glue:GetDatabase",
+      "glue:GetTable",
+      "glue:GetTables",
+      "glue:CreateTable",
+      "glue:UpdateTable",
+    ]
+    resources = [
+      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:catalog",
+      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:database/${var.gold_database_name}_iceberg",
+      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.gold_database_name}_iceberg/*",
+    ]
+  }
+  statement {
     sid = "GoldDirectoryMarkers"
     actions = [
       "s3:GetObject",

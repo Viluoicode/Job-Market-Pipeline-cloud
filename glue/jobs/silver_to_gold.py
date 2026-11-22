@@ -13,7 +13,8 @@ Reads typed Silver Parquet for one ``snapshot_date`` and writes three Gold marts
     table to answer it. Enriches ``demand_by_role`` with the columns a candidate actually decides on.
 
 All three are Parquet partitioned by ``snapshot_date`` so Athena prunes and the crawler discovers
-them.
+them. With ``--iceberg_database`` set, the same marts are also written to Apache Iceberg tables in
+shadow mode (see ``shadow_write_iceberg``) while the Parquet output remains the published contract.
 
 The transform logic lives in importable, Glue-free functions (``build_fact``,
 ``build_demand_by_role``, ``build_role_opportunity``) so ``tests/`` can exercise them on a local
@@ -24,8 +25,10 @@ Args (Glue job parameters):
   --LAKE_BUCKET    data lake bucket name
   --snapshot_date  required execution UTC date
   --run_id         required committed Silver run ID
+  --iceberg_database  optional Glue database for the shadow Iceberg marts
 """
 
+import json
 import sys
 
 from pipeline_contract import read_json, silver_path, validate_manifest
@@ -220,6 +223,49 @@ def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: 
     )
 
 
+ICEBERG_CATALOG = "glue_catalog"   # Spark catalog name configured by the Glue job's --conf
+
+
+def write_iceberg(df: DataFrame, table: str, snapshot_date: str):
+    """Replace one ``snapshot_date`` of an Iceberg table in a single atomic commit.
+
+    The first write creates the table (schema from the DataFrame, identity partition on
+    snapshot_date). Later writes use ``overwrite(<this day>)``, not ``overwritePartitions()``:
+    dynamic overwrite would keep the previous rows of this day when a rerun yields an empty mart.
+    Readers see the previous snapshot or the new one, never a half-written day. Returns the new
+    snapshot id (None only if a first write of an empty mart created no snapshot).
+    """
+    spark = df.sparkSession
+    namespace, name = table.rsplit(".", 1)
+    existing = {row.tableName for row in spark.sql(f"SHOW TABLES IN {namespace}").collect()}
+    if name not in existing:
+        df.writeTo(table).using("iceberg").partitionedBy(F.col("snapshot_date")).create()
+    else:
+        df.writeTo(table).overwrite(F.col("snapshot_date") == F.lit(snapshot_date).cast("date"))
+    latest = spark.sql(f"SELECT snapshot_id FROM {table}.snapshots ORDER BY committed_at DESC LIMIT 1").first()
+    return latest["snapshot_id"] if latest else None
+
+
+def shadow_write_iceberg(marts, *, run_id: str, snapshot_date: str, writer=write_iceberg) -> dict:
+    """Write each (table, DataFrame) to Iceberg; record outcomes instead of raising.
+
+    Shadow mode: the Parquet marts stay the published contract, so an Iceberg failure (missing
+    permission, catalog conflict) must not fail the pipeline. The record says which table failed.
+    """
+    record = {"run_id": run_id, "snapshot_date": snapshot_date, "mode": "shadow",
+              "status": "SUCCEEDED", "tables": {}}
+    for table, df in marts:
+        name = table.rsplit(".", 1)[-1]
+        try:
+            rows = df.count()
+            snapshot_id = writer(df, table, snapshot_date)
+        except Exception as exc:
+            record.update(status="FAILED", failed_table=name, error_type=type(exc).__name__, error=str(exc)[:1000])
+            break
+        record["tables"][name] = {"snapshot_id": snapshot_id, "rows": rows}
+    return record
+
+
 def main() -> None:
     import boto3
     from awsglue.context import GlueContext
@@ -277,6 +323,15 @@ def main() -> None:
             f"remote={row['remote_pct']}% (unknown {row['remote_unknown_pct']}%)  "
             f"top={row['top_company']} ({row['top_company_count']})"
         )
+
+    iceberg_database = optional_arg("iceberg_database", "")
+    if iceberg_database:
+        marts = [(f"{ICEBERG_CATALOG}.{iceberg_database}.{name}", df) for name, df in
+                 (("fact_job_posting", fact), ("demand_by_role", demand), ("role_opportunity", opportunity))]
+        record = shadow_write_iceberg(marts, run_id=run_id, snapshot_date=snapshot_date)
+        s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/run_id={run_id}.json",
+                      Body=json.dumps(record).encode("utf-8"), ContentType="application/json")
+        print(f"[silver_to_gold] iceberg shadow write: {json.dumps(record)}")
 
     job.commit()
     print("[silver_to_gold] done")
