@@ -1,7 +1,7 @@
 {
   "verified_at": "2026-09-16T15:17:01.443091+00:00",
   "execution": {
-    "executionArn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
+    "executionArn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
     "name": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9_3a4e7b21-e329-5c8e-0adc-fb8108cff169",
     "status": "SUCCEEDED",
     "startDate": "2026-09-16 01:00:16.275000+07:00",
@@ -12,11 +12,11 @@
     "id": "bb0e63dd-4ba7-3e0f-6ae4-cc994a7f4da9",
     "detail-type": "Scheduled Event",
     "source": "aws.events",
-    "account": "290488660407",
+    "account": "REDACTED_ACCOUNT_ID",
     "time": "2026-09-15T18:00:00Z",
     "region": "ap-southeast-1",
     "resources": [
-      "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule"
+      "arn:aws:events:ap-southeast-1:REDACTED_ACCOUNT_ID:rule/jobmarket-aws-pipeline-schedule"
     ],
     "detail": {}
   },
@@ -226,7 +226,7 @@
   },
   "schedule": {
     "Name": "jobmarket-aws-pipeline-schedule",
-    "Arn": "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule",
+    "Arn": "arn:aws:events:ap-southeast-1:REDACTED_ACCOUNT_ID:rule/jobmarket-aws-pipeline-schedule",
     "State": "ENABLED",
     "ScheduleExpression": "cron(0 18 * * ? *)"
   },

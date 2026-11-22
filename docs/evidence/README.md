@@ -17,3 +17,7 @@ observed at a specific time; they are not a live status page.
 
 Add a new dated record for a new milestone. Do not rewrite a historical observation, and never
 include credentials, personal email addresses, tokens, or sensitive payloads.
+
+The AWS account ID is not published: on 22 November 2026 it was replaced by `REDACTED_ACCOUNT_ID`
+in every ARN and bucket name of the files above. Nothing else in those records changed.
+`tests/test_evidence.py` keeps every evidence file valid JSON and fails if an account ID appears.

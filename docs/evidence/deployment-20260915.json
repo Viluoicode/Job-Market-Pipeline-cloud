@@ -1,7 +1,7 @@
 {
   "execution": {
     "run_id": "lifecycle-verify-20260915-1413",
-    "execution_arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:lifecycle-verify-20260915-1413",
+    "execution_arn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:lifecycle-verify-20260915-1413",
     "execution": {
       "status": "SUCCEEDED",
       "startDate": "2026-09-15 21:11:27.442000+07:00",
@@ -273,24 +273,24 @@
     "verified_at": "2026-09-15T14:19:57.769281+00:00",
     "rule": {
       "Name": "jobmarket-aws-pipeline-schedule",
-      "Arn": "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule",
+      "Arn": "arn:aws:events:ap-southeast-1:REDACTED_ACCOUNT_ID:rule/jobmarket-aws-pipeline-schedule",
       "ScheduleExpression": "cron(0 18 * * ? *)",
       "State": "ENABLED",
       "Description": "Scheduled trigger for the job-market pipeline (disabled by default).",
       "EventBusName": "default",
-      "CreatedBy": "290488660407"
+      "CreatedBy": "REDACTED_ACCOUNT_ID"
     },
     "targets": [
       {
         "Id": "terraform-20260727130055531500000001",
-        "Arn": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
-        "RoleArn": "arn:aws:iam::290488660407:role/jobmarket-aws-events-role"
+        "Arn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
+        "RoleArn": "arn:aws:iam::REDACTED_ACCOUNT_ID:role/jobmarket-aws-events-role"
       }
     ],
     "target_permission": [
       {
         "EvalActionName": "states:StartExecution",
-        "EvalResourceName": "arn:aws:states:ap-southeast-1:290488660407:stateMachine:jobmarket-aws-pipeline",
+        "EvalResourceName": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
         "EvalDecision": "allowed"
       }
     ],

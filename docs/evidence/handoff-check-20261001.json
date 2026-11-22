@@ -1,14 +1,14 @@
 {
   "checked_at": "2026-10-01T06:13:58.125427+00:00",
   "execution": {
-    "arn": "arn:aws:states:ap-southeast-1:290488660407:execution:jobmarket-aws-pipeline:5230fa72-72ab-08ef-faa0-508b4830ba28_63c3bdd4-bd61-486a-0470-0eddc868e7ff",
+    "arn": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:5230fa72-72ab-08ef-faa0-508b4830ba28_63c3bdd4-bd61-486a-0470-0eddc868e7ff",
     "status": "SUCCEEDED",
     "start": "2026-10-01 01:00:16.302000+07:00",
     "stop": "2026-10-01 01:10:44.253000+07:00",
     "trigger_source": "aws.events",
     "trigger_type": "Scheduled Event",
     "rule_arns": [
-      "arn:aws:events:ap-southeast-1:290488660407:rule/jobmarket-aws-pipeline-schedule"
+      "arn:aws:events:ap-southeast-1:REDACTED_ACCOUNT_ID:rule/jobmarket-aws-pipeline-schedule"
     ]
   },
   "publication": {
