@@ -49,7 +49,7 @@ $pipelineArn = terraform -chdir=infra output -raw state_machine_arn
 aws stepfunctions start-execution --state-machine-arn $pipelineArn --region ap-southeast-1
 ```
 
-Initially keep `enable_schedule=false`. Verify ingestion, Silver DQ, Gold and crawler success,
+Initially keep `enable_schedule=false`. Verify ingestion, Silver DQ, the Gold version record,
 matching state pointers, released lock and a fresh ingestion manifest. Then set
 `enable_schedule=true`, review a new plan and apply. Default schedule: 18:00 UTC / 01:00 UTC+7.
 Existing reference deployment already has this enabled; no laptop needs to stay on.
@@ -80,17 +80,17 @@ English: verify the enabled rule, today's execution and trigger input, the compl
 matching ingestion manifest, then refresh the dashboard. A list of S3 buckets alone proves none
 of these. 01:00 on 28 September in Vietnam corresponds to snapshot 27 September UTC.
 
-**Iceberg shadow phase (task 5.1 A).** After a scheduled run, compare the published Parquet marts
-with the shadow Iceberg copy. Exit code 0 means `MATCH`; keep the dated JSON as evidence. A shadow
-failure never blocks publication: read `state/gold_iceberg/run_id=<run>.json` for the failed table
-and error, fix it, and let the next run retry.
+**Gold versions.** `state/pipeline/latest.json` carries `iceberg_snapshots`: the snapshot id and
+row count of each Gold table committed by that run. A run whose Gold job fails publishes nothing
+and the previous completion marker stays in force. To inspect a version or travel back:
 
-```powershell
-python scripts/compare_iceberg.py --output docs/evidence/iceberg-parity-<yyyymmdd>.json
+```sql
+SELECT * FROM "jobmarket_aws_gold_iceberg"."fact_job_posting$snapshots" ORDER BY committed_at DESC;
+SELECT count(*) FROM jobmarket_aws_gold_iceberg.fact_job_posting FOR VERSION AS OF <snapshot_id>;
 ```
 
-Giai đoạn A: Parquet vẫn là dữ liệu chính thức. Chỉ chuyển dashboard sang Iceberg khi nhiều ngày
-liên tiếp đều `MATCH`.
+`scripts/compare_iceberg.py` compared the legacy Parquet Gold with Iceberg during the migration;
+it applies only to dates that have both.
 
 ## Open the dashboard / Mở dashboard
 
@@ -177,23 +177,24 @@ window, and unobserved jobs become inactive after seven days. See [architecture]
 
 A failed workflow should release its lock when caught. Check CloudWatch logs and fix the cause,
 then start a **new complete execution**. Gold writes are not transactional across marts; an
-interrupted same-day run can leave mixed files until repaired. Never use MAX(snapshot_date) as
+interrupted same-day run cannot leave a half-written table: each Iceberg commit is atomic, and
+the completion marker keeps pointing at the last published versions until a run succeeds. Never use MAX(snapshot_date) as
 proof of healthy publication. Do not redrive only an inner task or bypass lock ownership.
 
 **Automatic lock recovery.** The `jobmarket-aws-lock-janitor` Lambda runs when an execution ends
 FAILED/TIMED_OUT/ABORTED and every 15 minutes. It deletes the lock only when its owner execution
-has ended, none of the three Glue jobs has an active run, and the crawler is READY; the delete is
+has ended and none of the three Glue jobs has an active run; the delete is
 conditional on the inspected owner ARN. It never stops jobs or starts executions. Check its
 decision in `/aws/lambda/jobmarket-aws-lock-janitor` (`action`: `released`, `waiting_for_glue`,
-`waiting_for_crawler`, `owner_running`, `no_lock`). A Glue run that outlives its execution keeps
+`owner_running`, `no_lock`). A Glue run that outlives its execution keeps
 the lock until it ends (at most its job timeout); then the next sweep releases it.
 
-Tự động: janitor chỉ gỡ khóa khi execution đã kết thúc **và** Glue/crawler đã dừng. Sau khi log
+Tự động: janitor chỉ gỡ khóa khi execution đã kết thúc **và** các Glue job đã dừng. Sau khi log
 báo `released`, bắt đầu một execution mới đầy đủ. Nếu alarm `lock-janitor-errors` báo lỗi, làm thủ công:
 
 Manual fallback for an aborted/timed-out run with an orphaned lock:
 1. Read `LockId=pipeline` in the lock table and record its `ExecutionArn`.
-2. Confirm that execution ended, all three Glue jobs have no active runs, and the crawler is READY.
+2. Confirm that execution ended and all three Glue jobs have no active runs.
    Stopping Step Functions does not guarantee external Glue jobs stopped.
 3. Delete only that lock with a DynamoDB condition requiring the inspected owner ARN to still match.
 4. Start a new execution and verify freshness and dashboard publication.
@@ -212,7 +213,7 @@ staleness after 26 hours; this is expected while paused. Resume by reviewing and
 Bronze, Silver, Gold and state. Export required evidence and data first. Never execute cleanup
 against another project's resources or a shared stack.
 
-1. Disable the daily schedule as above and wait for active pipeline/Glue/crawler work to finish.
+1. Disable the daily schedule as above and wait for active pipeline/Glue work to finish.
 2. Export evidence and required datasets outside the buckets being removed. Verify the export.
 3. Confirm the AWS account, region, Terraform state and resource list belong to this lab.
 4. Review a destroy plan; execute only when intentionally retiring the lab.
@@ -229,7 +230,7 @@ terraform -chdir=infra plan -destroy -out=cleanup.tfplan
 terraform -chdir=infra apply cleanup.tfplan
 ```
 
-   The shadow Iceberg tables are created by the Gold job, not by Terraform; destroying the
+   The Gold Iceberg tables are created by the Gold job, not by Terraform; destroying the
    `_iceberg` Glue database removes them, and their files live under `gold_iceberg/` in the lake.
 5. Verify stack resources are gone. Review residual Glue-created log groups, artifacts and resources
    created manually outside Terraform; remove only those owned by this lab after retaining evidence.

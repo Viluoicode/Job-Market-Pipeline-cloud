@@ -1,5 +1,5 @@
 # Lock janitor: release the writer lock left behind by an ABORTED/TIMED_OUT (or failed-to-release)
-# execution, but only after every Glue job run and the crawler are inactive. The table keeps no TTL
+# execution, but only after every pipeline Glue job run is inactive. The table keeps no TTL
 # on purpose (see ingestion.tf); this function is the safe, condition-checked replacement.
 locals {
   pipeline_job_names = [
@@ -52,11 +52,6 @@ data "aws_iam_policy_document" "lock_janitor" {
     resources = [aws_glue_job.ingestion.arn, aws_glue_job.bronze_to_silver.arn, aws_glue_job.silver_to_gold.arn]
   }
   statement {
-    sid       = "ReadCrawlerState"
-    actions   = ["glue:GetCrawler"]
-    resources = [aws_glue_crawler.gold.arn]
-  }
-  statement {
     actions   = ["logs:CreateLogStream", "logs:PutLogEvents"]
     resources = ["${aws_cloudwatch_log_group.lock_janitor.arn}:*"]
   }
@@ -90,7 +85,6 @@ resource "aws_lambda_function" "lock_janitor" {
       LOCK_TABLE        = aws_dynamodb_table.pipeline_lock.name
       STATE_MACHINE_ARN = aws_sfn_state_machine.pipeline.arn
       GLUE_JOB_NAMES    = join(",", local.pipeline_job_names)
-      CRAWLER_NAME      = aws_glue_crawler.gold.name
     }
   }
   depends_on = [aws_iam_role_policy.lock_janitor, aws_cloudwatch_log_group.lock_janitor]

@@ -32,12 +32,14 @@ Nếu repo có sẵn môi trường, dùng môi trường đó; không cần t�
 Read [proposal](proposal.md), [architecture](architecture.md) and [data dictionary](data-dictionary.md).
 
 **VI:** EventBridge gọi Step Functions; lock tránh ghi đồng thời. Glue Python Shell tải API vào
-Bronze; Glue Spark tạo Silver và Gold; crawler cập nhật Catalog; Athena đọc Parquet. Marker chỉ
-công bố sau khi hoàn tất. Lambda độc lập kiểm tra dữ liệu mới và gửi metric/alarm qua CloudWatch/SNS.
+Bronze; Glue Spark tạo Silver và ghi Gold thành bảng Apache Iceberg (job tự cập nhật Catalog,
+không cần crawler); Athena đọc đúng phiên bản Iceberg ghi trong marker. Marker chỉ công bố sau khi
+hoàn tất. Lambda độc lập kiểm tra dữ liệu mới và gửi metric/alarm qua CloudWatch/SNS.
 
 **EN:** EventBridge starts Step Functions, which serializes writers with a DynamoDB lock. Python
-Shell ingests Bronze; Spark builds Silver and Gold; a crawler updates the Catalog for Athena.
-Completion metadata is published after success. An independent Lambda monitors publication health.
+Shell ingests Bronze; Spark builds Silver and commits Gold as Apache Iceberg tables, which the
+job registers in the Catalog itself. Completion metadata, including each Gold table's snapshot id,
+is published after success. An independent Lambda monitors publication health.
 
 ## 4. Triển khai và chạy / Deploy and run
 
@@ -48,7 +50,7 @@ thủ công đạt; kiểm tra plan trước apply. Với stack đang chạy, ki
 review the plan, deploy, start the state machine and inspect every stage. An existing healthy
 reference stack does not need redeployment to run the dashboard.
 
-Expected stages: ingestion → Silver and DQ → Gold → crawler → completion → lock release.
+Expected stages: ingestion → Silver and DQ → Gold (Iceberg commits) → version check → completion → lock release.
 Kết quả mong đợi: từng stage thành công, manifest và state pointers cùng run ID.
 
 ## 5. Dashboard đọc AWS / Run the dashboard
@@ -144,9 +146,9 @@ Requirements reviewed 28 September 2026:
    ngay dưới tiêu đề chính và link `[Editable diagram](diagrams/architecture.drawio)`.
 4. Đối chiếu bản vẽ với deployment: AWS region Singapore; API và local Streamlit ở ngoài AWS;
    EventBridge → Step Functions, DynamoDB lock, ba Glue jobs, S3 lake Bronze/Silver/Gold,
-   crawler → Catalog → Athena, bucket scripts và Athena results; health Lambda → CloudWatch → SNS.
+   Gold Iceberg → Catalog → Athena, bucket scripts và Athena results; health Lambda → CloudWatch → SNS.
    Dùng nét khác nhau cho orchestration và data; không tự thêm VPC/NAT/subnet chưa triển khai.
-5. IAM: thể hiện role Silver, Gold, Crawler riêng và dashboard assume reader role. Đối chiếu
+5. IAM: thể hiện role Silver, Gold riêng và dashboard assume reader role. Đối chiếu
    [ma trận quyền](security-review.md), không dùng role Glue chung của thiết kế cũ.
 
 EN: Commit both editable diagram and export. Embed the export in README's Architecture section,

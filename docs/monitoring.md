@@ -34,7 +34,7 @@ execution xử lý; coverage không đại diện cho lượt thất bại chưa
 
 SNS gửi khi alarm chuyển sang ALARM; hai alarm health/coverage cũng gửi khi trở lại OK.
 Các cảnh báo này không tự khởi động lại pipeline và không tự xóa khóa DynamoDB. Việc gỡ khóa
-mồ côi do Lambda lock janitor riêng đảm nhận, có kiểm tra Glue/crawler (xem operations.md).
+mồ côi do Lambda lock janitor riêng đảm nhận, có kiểm tra các Glue job (xem operations.md).
 
 
 ## Email verification / Kiểm tra email

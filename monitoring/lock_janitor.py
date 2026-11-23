@@ -6,8 +6,8 @@ stops with PipelineBusy. This janitor automates the manual recovery in docs/oper
 
   1. read LockId=pipeline and its owner ExecutionArn;
   2. keep the lock while the owner execution is still RUNNING;
-  3. keep it while any pipeline Glue job run or the crawler is active, because stopping Step
-     Functions does not guarantee an external Glue job stopped writing;
+  3. keep it while any pipeline Glue job run is active, because stopping Step Functions does not
+     guarantee an external Glue job stopped writing;
   4. otherwise delete it, conditional on the owner still matching (a new execution may have
      taken the lock in between).
 
@@ -43,7 +43,7 @@ def _owner_status(sfn, owner):
         raise
 
 
-def sweep(dynamodb, sfn, glue, *, table, state_machine_arn, job_names, crawler_name):
+def sweep(dynamodb, sfn, glue, *, table, state_machine_arn, job_names):
     item = dynamodb.get_item(TableName=table, Key=LOCK_KEY, ConsistentRead=True).get("Item")
     if not item:
         return {"action": "no_lock"}
@@ -60,9 +60,6 @@ def sweep(dynamodb, sfn, glue, *, table, state_machine_arn, job_names, crawler_n
     active = _active_job_runs(glue, job_names)
     if active:
         return {"action": "waiting_for_glue", "owner": owner, "active_job_runs": active}
-    crawler_state = glue.get_crawler(Name=crawler_name)["Crawler"]["State"]
-    if crawler_state != "READY":
-        return {"action": "waiting_for_crawler", "owner": owner, "crawler_state": crawler_state}
 
     try:
         dynamodb.delete_item(
@@ -88,7 +85,6 @@ def handler(event, context):
         table=os.environ["LOCK_TABLE"],
         state_machine_arn=os.environ["STATE_MACHINE_ARN"],
         job_names=[n for n in os.environ["GLUE_JOB_NAMES"].split(",") if n],
-        crawler_name=os.environ["CRAWLER_NAME"],
     )
     print(json.dumps({"trigger": (event or {}).get("source", "manual"), **result}, sort_keys=True))
     return result

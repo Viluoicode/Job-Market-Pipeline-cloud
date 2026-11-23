@@ -2,7 +2,7 @@
 -- A MAX(snapshot_date) alone says which snapshot is newest, not whether it is fresh or published.
 -- The July 2026 legacy snapshots used accumulated input and synthetic last_seen_at timestamps.
 
--- Athena analysis over the Gold marts (database: jobmarket_aws_gold).
+-- Athena analysis over the Gold marts (database: jobmarket_aws_gold_iceberg, Apache Iceberg tables).
 -- Console: pick the `jobmarket-aws` workgroup, then run these one at a time.
 -- Use partition predicates and inspect bytes scanned; small sample results do not guarantee future cost.
 -- The workgroup caps each query at 10 GiB scanned.
@@ -10,14 +10,14 @@
 -- 0) THE DECISION QUERY — the role_opportunity mart in one shot: demand rank, remote share, and
 --    the top hiring company per role. The dashboard derives filtered charts from the fact table.
 SELECT demand_rank, role, job_count, remote_pct, remote_unknown_pct, top_company, top_company_count
-FROM jobmarket_aws_gold.role_opportunity
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.role_opportunity)
+FROM jobmarket_aws_gold_iceberg.role_opportunity
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.role_opportunity)
 ORDER BY demand_rank;
 
 -- 1) Headline leaderboard — demand by target role for the latest snapshot.
 SELECT role, job_count
-FROM jobmarket_aws_gold.demand_by_role
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.demand_by_role)
+FROM jobmarket_aws_gold_iceberg.demand_by_role
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.demand_by_role)
 ORDER BY job_count DESC;
 
 -- 2) Work-mode split across all active postings (latest snapshot). is_remote is tri-state:
@@ -26,23 +26,23 @@ SELECT
     CASE is_remote WHEN true THEN 'remote' WHEN false THEN 'onsite/hybrid' ELSE 'unknown' END AS work_mode,
     count(*)                                              AS postings,
     round(100.0 * count(*) / sum(count(*)) OVER (), 1)   AS pct
-FROM jobmarket_aws_gold.fact_job_posting
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
+FROM jobmarket_aws_gold_iceberg.fact_job_posting
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.fact_job_posting)
 GROUP BY 1
 ORDER BY postings DESC;
 
 -- 3) Top hiring companies (latest snapshot).
 SELECT company, count(*) AS postings
-FROM jobmarket_aws_gold.fact_job_posting
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
+FROM jobmarket_aws_gold_iceberg.fact_job_posting
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.fact_job_posting)
 GROUP BY company
 ORDER BY postings DESC
 LIMIT 20;
 
 -- 4) Where the postings come from — volume by source platform.
 SELECT source, count(*) AS postings
-FROM jobmarket_aws_gold.fact_job_posting
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
+FROM jobmarket_aws_gold_iceberg.fact_job_posting
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.fact_job_posting)
 GROUP BY source
 ORDER BY postings DESC;
 
@@ -54,20 +54,20 @@ SELECT
     sum(if(is_remote, 1, 0))                                          AS remote_postings,
     round(100.0 * sum(if(is_remote, 1, 0)) / count(*), 1)            AS remote_pct,
     round(100.0 * count_if(is_remote IS NULL) / count(*), 1)         AS unknown_pct
-FROM jobmarket_aws_gold.fact_job_posting
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
+FROM jobmarket_aws_gold_iceberg.fact_job_posting
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.fact_job_posting)
 GROUP BY source
 ORDER BY postings DESC;
 
 -- 6) Demand trend over time — handy once you have more than one snapshot.
 SELECT snapshot_date, role, job_count
-FROM jobmarket_aws_gold.demand_by_role
+FROM jobmarket_aws_gold_iceberg.demand_by_role
 ORDER BY snapshot_date DESC, job_count DESC;
 
 -- 7) The Data Engineer market (the role this portfolio targets) — sample of live postings.
 SELECT company, title, location, is_remote, apply_url
-FROM jobmarket_aws_gold.fact_job_posting
-WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold.fact_job_posting)
+FROM jobmarket_aws_gold_iceberg.fact_job_posting
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.fact_job_posting)
   AND lower(title) LIKE '%data engineer%'
 ORDER BY company
 LIMIT 50;

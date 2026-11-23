@@ -1,4 +1,9 @@
-"""Read an explicitly published Gold partition. Never select MAX(snapshot_date)."""
+"""Read an explicitly published Gold snapshot. Never select MAX(snapshot_date).
+
+Gold is Apache Iceberg. The completion marker names the table version (snapshot id) that the run
+committed, and every read is pinned to it with FOR VERSION AS OF, so a later commit can never
+mix into what the page shows.
+"""
 import json
 import re
 import time
@@ -43,7 +48,14 @@ def validate_publication(completion, silver, manifest, now=None):
         raise PublicationUnavailable("Invalid publication metadata.") from exc
     if not 0 <= age <= 26:
         raise PublicationUnavailable("Data is older than 26 hours or has a future timestamp.")
-    return {"run_id": run, "snapshot_date": snapshot, "ingested_at": manifest["completed_at"],
+    try:
+        fact_snapshot = str(completion["iceberg_snapshots"]["fact_job_posting"]["snapshot_id"])
+    except (TypeError, KeyError) as exc:
+        raise PublicationUnavailable("Publication does not name the Gold table version.") from exc
+    if not re.fullmatch(r"[0-9]{1,20}", fact_snapshot):
+        raise PublicationUnavailable("Publication names an invalid Gold table version.")
+    return {"run_id": run, "snapshot_date": snapshot, "fact_snapshot_id": fact_snapshot,
+            "ingested_at": manifest["completed_at"],
             "published_at": completion["completed_at"], "ingestion_age_hours": round(age, 2),
             "rows_ingested": manifest["total_records"], "successful_boards": manifest["successful_boards"],
             "failed_boards": manifest["failed_boards"],
@@ -70,14 +82,19 @@ def read_publication(session, bucket, lock_table):
     return metadata, tuple(fingerprints)
 
 
-def query_fact(session, database, workgroup, snapshot_date, *, timeout=120, max_rows=50000):
+def query_fact(session, database, workgroup, snapshot_date, snapshot_id, *, timeout=120, max_rows=50000):
     if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", database):
         raise ValueError("Invalid database identifier")
     if date.fromisoformat(snapshot_date).isoformat() != snapshot_date:
         raise ValueError("Invalid snapshot date")
+    if not re.fullmatch(r"[0-9]{1,20}", str(snapshot_id)):
+        raise ValueError("Invalid table version")
+    # Iceberg keeps microsecond timestamps with a time zone; show them as before (UTC, milliseconds).
     sql = ("SELECT job_id, company, title, location, source, is_remote, apply_url, "
-           "first_seen_at, last_seen_at, snapshot_date FROM fact_job_posting "
-           f"WHERE snapshot_date = '{snapshot_date}' ORDER BY company, title, job_id")
+           "format_datetime(first_seen_at, 'yyyy-MM-dd HH:mm:ss.SSS') AS first_seen_at, "
+           "format_datetime(last_seen_at, 'yyyy-MM-dd HH:mm:ss.SSS') AS last_seen_at, snapshot_date "
+           f"FROM fact_job_posting FOR VERSION AS OF {snapshot_id} "
+           f"WHERE snapshot_date = DATE '{snapshot_date}' ORDER BY company, title, job_id")
     athena = session.client("athena")
     query_id = athena.start_query_execution(QueryString=sql,
         QueryExecutionContext={"Database": database}, WorkGroup=workgroup)["QueryExecutionId"]
@@ -114,7 +131,7 @@ def query_fact(session, database, workgroup, snapshot_date, *, timeout=120, max_
 
 def load_verified(session, bucket, lock_table, database, workgroup):
     metadata, before = read_publication(session, bucket, lock_table)
-    records, query = query_fact(session, database, workgroup, metadata["snapshot_date"])
+    records, query = query_fact(session, database, workgroup, metadata["snapshot_date"], metadata["fact_snapshot_id"])
     _, after = read_publication(session, bucket, lock_table)
     if before != after:
         raise PublicationUnavailable("Publication changed while loading. Refresh to read the new run.")

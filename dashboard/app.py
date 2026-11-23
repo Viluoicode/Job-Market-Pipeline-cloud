@@ -54,7 +54,7 @@ if not bucket or not lock_table or not reader_role_arn:
     st.info("Set LAKE_BUCKET, PIPELINE_LOCK_TABLE and AWS_DASHBOARD_ROLE_ARN before starting. See docs/workshop.md.")
     st.stop()
 region = os.getenv("AWS_REGION", "ap-southeast-1")
-database = os.getenv("ATHENA_DATABASE", "jobmarket_aws_gold")
+database = os.getenv("ATHENA_DATABASE", "jobmarket_aws_gold_iceberg")
 workgroup = os.getenv("ATHENA_WORKGROUP", "jobmarket-aws")
 @st.cache_resource(ttl=2700, show_spinner=False)
 def reader_session(region, role_arn):
@@ -63,9 +63,9 @@ def reader_session(region, role_arn):
 
 
 @st.cache_data(ttl=900, show_spinner=False)
-def load_fact(region, database, workgroup, bucket, reader_role_arn, fingerprint, snapshot):
-    # Fingerprint is part of the cache key: a same-day republish must invalidate the cache.
-    return query_fact(reader_session(region, reader_role_arn), database, workgroup, snapshot)
+def load_fact(region, database, workgroup, bucket, reader_role_arn, fingerprint, snapshot, snapshot_id):
+    # Fingerprint and table version are part of the cache key: a same-day republish invalidates it.
+    return query_fact(reader_session(region, reader_role_arn), database, workgroup, snapshot, snapshot_id)
 
 if st.button("Refresh data", type="primary"):
     load_fact.clear()
@@ -73,7 +73,8 @@ try:
     with st.spinner("Checking publication and reading the current snapshot…"):
         session = reader_session(region, reader_role_arn)
         metadata, before = read_publication(session, bucket, lock_table)
-        rows, query = load_fact(region, database, workgroup, bucket, reader_role_arn, before, metadata["snapshot_date"])
+        rows, query = load_fact(region, database, workgroup, bucket, reader_role_arn, before,
+                                metadata["snapshot_date"], metadata["fact_snapshot_id"])
         _, after = read_publication(session, bucket, lock_table)
         if before != after:
             raise PublicationUnavailable("Publication changed while loading. Refresh to try again.")

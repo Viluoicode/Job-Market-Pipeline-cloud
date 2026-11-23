@@ -7,7 +7,8 @@ rates in [AWS Pricing Calculator](https://calculator.aws/) before submission. Pr
 eligibility, tax and credits can change. Capture and link the saved estimate in the workshop report.
 
 Example workload: 30 daily runs/month; each Spark job uses two G.1X workers for five billed minutes;
-Python Shell uses 0.0625 DPU for two minutes; crawler uses two DPUs for ten billed minutes. Replace
+Python Shell uses 0.0625 DPU for two minutes. Since the Iceberg switch (Nov 2026) there is no
+crawler; before it, the crawler billed about $0.049 per run (measured, see README). Replace
 these assumptions with your observed billed duration. Glue startup/wall time is not automatically
 billable DPU time. The AWS Glue pricing page illustrates $0.44/DPU-hour; regional rates can differ.
 
@@ -15,10 +16,9 @@ billable DPU time. The AWS Glue pricing page illustrates $0.44/DPU-hour; regiona
 | --- | --- | --- |
 | Two Spark jobs | 30 × 2 jobs × 2 DPU × 5/60 hours × $0.44 | 4.40 |
 | Python Shell ingestion | 30 × 0.0625 × 2/60 × $0.44 | 0.03 |
-| Crawler | 30 × 2 × 10/60 × $0.44 | 4.40 |
 | Athena SQL | 1,000 queries × assumed 10 MB billable minimum × $5/TB | About 0.05 |
 | S3, requests, logs, metrics/alarms, Step Functions, DynamoDB, Lambda, SNS, EventBridge | Provisional allowance; not a service-by-service quote | 5.00 |
-| Illustrative total | Before credits/tax; excludes retries and public hosting | About 13.88 |
+| Illustrative total | Before credits/tax; excludes retries and public hosting | About 9.48 |
 
 The $5 allowance must be replaced with per-service calculator entries for formal submission; this
 example is not a spending ceiling. The existing $10 budget can alert below this illustration.
@@ -27,7 +27,7 @@ example is not a spending ceiling. The existing $10 budget can alert below this 
 
 **VI:** Credit 200 USD không biến dịch vụ thành miễn phí vô hạn. Theo dõi gross usage và credit còn
 lại; không dự đoán số tháng dùng được từ một lượt chạy. EventBridge điều phối lịch; phần chi phí
-đáng chú ý của lab nằm ở công việc lịch đó gọi, nhất là Glue và crawler.
+đáng chú ý của lab nằm ở công việc lịch đó gọi, nhất là Glue.
 
 **EN:** Credits offset eligible charges but do not cap usage. Track usage before credits as well as
 remaining credit. A schedule can initiate billable work even while the laptop is off.

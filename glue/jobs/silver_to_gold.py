@@ -1,20 +1,23 @@
 """Glue (PySpark) — Silver -> Gold.
 
-Reads typed Silver Parquet for one ``snapshot_date`` and writes three Gold marts:
+Reads typed Silver Parquet for one ``snapshot_date`` and writes three Gold marts as Apache Iceberg
+tables (database ``--iceberg_database``, data under ``s3://<lake>/gold_iceberg/``):
 
-  * ``gold/fact_job_posting/`` — one row per ACTIVE posting, deduplicated cross-source by content
+  * ``fact_job_posting`` — one row per ACTIVE posting, deduplicated cross-source by content
     hash (keep a single representative per ``dedup_hash``). ``posting_count = 1`` is the additive
     measure. Mirrors SkillRadar's ``fact_job_posting`` dbt model.
-  * ``gold/demand_by_role/``   — per target role, the count of DISTINCT deduped postings whose
+  * ``demand_by_role``   — per target role, the count of DISTINCT deduped postings whose
     title matches the role's patterns, for this snapshot. Mirrors ``int_posting_roles`` +
     role-level demand (first matching role family by priority, one role per posting).
-  * ``gold/role_opportunity/`` — the DECISION mart: per role, demand rank + remote share + the
+  * ``role_opportunity`` — the DECISION mart: per role, demand rank + remote share + the
     single top-hiring company, so the question "which role should I learn / apply for?" has one
     table to answer it. Enriches ``demand_by_role`` with the columns a candidate actually decides on.
 
-All three are Parquet partitioned by ``snapshot_date`` so Athena prunes and the crawler discovers
-them. With ``--iceberg_database`` set, the same marts are also written to Apache Iceberg tables in
-shadow mode (see ``shadow_write_iceberg``) while the Parquet output remains the published contract.
+Each table is partitioned by ``snapshot_date`` and each day is replaced in one atomic commit, so a
+reader sees the previous version or the new one, never half a day. The job records the three new
+snapshot ids in ``state/gold_iceberg/run_id=<run>.json``; Step Functions copies them into the
+completion marker, and readers query that exact version. The schema comes from this code: there is
+no crawler. (Until 2026-11 the marts were plain Parquet under ``gold/``; those files are kept.)
 
 The transform logic lives in importable, Glue-free functions (``build_fact``,
 ``build_demand_by_role``, ``build_role_opportunity``) so ``tests/`` can exercise them on a local
@@ -25,7 +28,7 @@ Args (Glue job parameters):
   --LAKE_BUCKET    data lake bucket name
   --snapshot_date  required execution UTC date
   --run_id         required committed Silver run ID
-  --iceberg_database  optional Glue database for the shadow Iceberg marts
+  --iceberg_database  Glue database of the Gold Iceberg tables
 """
 
 import json
@@ -109,15 +112,6 @@ ROLE_PATTERNS = [(0, None, regex) for regex in ROLE_EXCLUDE] + [
     for regex in regexes
 ]
 ROLE_FAMILIES = list(dict.fromkeys(role for role, _ in DEFAULT_ROLES))
-
-
-def optional_arg(name: str, default: str) -> str:
-    flag = f"--{name}"
-    if flag in sys.argv:
-        i = sys.argv.index(flag)
-        if i + 1 < len(sys.argv):
-            return sys.argv[i + 1]
-    return default
 
 
 def make_roles_df(spark: SparkSession) -> DataFrame:
@@ -246,23 +240,21 @@ def write_iceberg(df: DataFrame, table: str, snapshot_date: str):
     return latest["snapshot_id"] if latest else None
 
 
-def shadow_write_iceberg(marts, *, run_id: str, snapshot_date: str, writer=write_iceberg) -> dict:
-    """Write each (table, DataFrame) to Iceberg; record outcomes instead of raising.
+def publish_iceberg(marts, *, run_id: str, snapshot_date: str, writer=write_iceberg) -> dict:
+    """Commit each (table, DataFrame) to Iceberg and return the run's version record.
 
-    Shadow mode: the Parquet marts stay the published contract, so an Iceberg failure (missing
-    permission, catalog conflict) must not fail the pipeline. The record says which table failed.
+    Any failure raises: Gold is the published contract, so the run must fail, release its lock and
+    alarm rather than publish an incomplete set. Snapshot ids are stored as text because they exceed
+    2**53 and would lose digits in any JSON reader that parses numbers as floats.
     """
-    record = {"run_id": run_id, "snapshot_date": snapshot_date, "mode": "shadow",
-              "status": "SUCCEEDED", "tables": {}}
+    record = {"run_id": run_id, "snapshot_date": snapshot_date, "status": "SUCCEEDED", "tables": {}}
     for table, df in marts:
         name = table.rsplit(".", 1)[-1]
-        try:
-            rows = df.count()
-            snapshot_id = writer(df, table, snapshot_date)
-        except Exception as exc:
-            record.update(status="FAILED", failed_table=name, error_type=type(exc).__name__, error=str(exc)[:1000])
-            break
-        record["tables"][name] = {"snapshot_id": snapshot_id, "rows": rows}
+        rows = df.count()
+        snapshot_id = writer(df, table, snapshot_date)
+        if snapshot_id is None:
+            raise ValueError(f"{name}: the write committed no snapshot")
+        record["tables"][name] = {"snapshot_id": str(snapshot_id), "rows": rows}
     return record
 
 
@@ -273,7 +265,7 @@ def main() -> None:
     from awsglue.utils import getResolvedOptions
     from pyspark.context import SparkContext
 
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date", "iceberg_database"])
     snapshot_date, run_id = args["snapshot_date"], args["run_id"]
     bucket = args["LAKE_BUCKET"]
     s3 = boto3.client("s3")
@@ -287,7 +279,6 @@ def main() -> None:
     glue = GlueContext(sc)
     spark = glue.spark_session
     spark.conf.set("spark.sql.session.timeZone", "UTC")
-    spark.conf.set("spark.sql.sources.partitionOverwriteMode", "dynamic")
     job = Job(glue)
     job.init(args["JOB_NAME"], args)
 
@@ -298,25 +289,13 @@ def main() -> None:
     # ---- fact_job_posting ----------------------------------------------------------------------
     fact = build_fact(silver).cache()
     print(f"[silver_to_gold] fact_job_posting rows (deduped): {fact.count()}")
-    fact_path = f"s3://{bucket}/gold/fact_job_posting/"
-    # Overwrite the exact daily partition, including when a mart becomes empty on rerun.
-    # Dynamic partition overwrite would leave the previous nonempty data in that case.
-    (fact.drop("snapshot_date").write.mode("overwrite").parquet(f"{fact_path}snapshot_date={snapshot_date}/"))
-    print(f"[silver_to_gold] wrote {fact_path}")
-
     roles_df = make_roles_df(spark)
 
     # ---- demand_by_role ------------------------------------------------------------------------
     demand = build_demand_by_role(fact, roles_df, snapshot_date)
-    demand_path = f"s3://{bucket}/gold/demand_by_role/"
-    (demand.drop("snapshot_date").write.mode("overwrite").parquet(f"{demand_path}snapshot_date={snapshot_date}/"))
-    print(f"[silver_to_gold] wrote {demand_path}")
 
     # ---- role_opportunity (decision mart) ------------------------------------------------------
     opportunity = build_role_opportunity(fact, roles_df, snapshot_date)
-    opp_path = f"s3://{bucket}/gold/role_opportunity/"
-    (opportunity.drop("snapshot_date").write.mode("overwrite").parquet(f"{opp_path}snapshot_date={snapshot_date}/"))
-    print(f"[silver_to_gold] wrote {opp_path}")
     for row in opportunity.collect():
         print(
             f"    #{row['demand_rank']} {row['role']:<28} demand={row['job_count']:<5} "
@@ -324,14 +303,14 @@ def main() -> None:
             f"top={row['top_company']} ({row['top_company_count']})"
         )
 
-    iceberg_database = optional_arg("iceberg_database", "")
-    if iceberg_database:
-        marts = [(f"{ICEBERG_CATALOG}.{iceberg_database}.{name}", df) for name, df in
-                 (("fact_job_posting", fact), ("demand_by_role", demand), ("role_opportunity", opportunity))]
-        record = shadow_write_iceberg(marts, run_id=run_id, snapshot_date=snapshot_date)
-        s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/run_id={run_id}.json",
-                      Body=json.dumps(record).encode("utf-8"), ContentType="application/json")
-        print(f"[silver_to_gold] iceberg shadow write: {json.dumps(record)}")
+    # ---- publish: one atomic Iceberg commit per table, then the version record --------------
+    marts = [(f"{ICEBERG_CATALOG}.{args['iceberg_database']}.{name}", df) for name, df in
+             (("fact_job_posting", fact), ("demand_by_role", demand), ("role_opportunity", opportunity))]
+    record = publish_iceberg(marts, run_id=run_id, snapshot_date=snapshot_date)
+    # Written last: Step Functions publishes completion only from this record.
+    s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/run_id={run_id}.json",
+                  Body=json.dumps(record).encode("utf-8"), ContentType="application/json")
+    print(f"[silver_to_gold] committed Iceberg versions: {json.dumps(record)}")
 
     job.commit()
     print("[silver_to_gold] done")

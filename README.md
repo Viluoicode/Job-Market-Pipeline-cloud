@@ -33,9 +33,10 @@ the result through Athena to a read-only Streamlit dashboard.
 2. A **Glue Python Shell** job calls the job-board APIs, five at a time, writes raw JSON to
    `bronze/` and then commits a run manifest. Later stages read only the objects it lists.
 3. A **Glue Spark** job builds Silver: it reconciles each posting's lifecycle and stops the run if
-   **Glue Data Quality** rules fail. A second Spark job writes three Gold marts.
-4. A crawler registers the Gold tables. The workflow checks that this run's crawl succeeded before
-   it publishes a completion marker, and **Athena** serves the marts.
+   **Glue Data Quality** rules fail. A second Spark job commits three Gold marts as **Apache
+   Iceberg** tables, one atomic commit per table.
+4. The workflow checks the Gold job's version record, then publishes a completion marker that names
+   each table's Iceberg snapshot. **Athena** serves exactly those versions.
 5. A **Lambda** health monitor checks freshness every 15 minutes and alarms through **SNS**. A
    lock-janitor Lambda frees a lock left behind by an aborted run.
 
@@ -54,13 +55,14 @@ More: [architecture and invariants](docs/architecture.md) ·
   of closures.
 - **One writer, released by evidence.** A conditional DynamoDB lock serializes the workflow, with
   no TTL that could expire mid-write. A lock-janitor Lambda releases an orphaned lock only after the
-  owning execution has ended and no Glue job or crawl is still running.
+  owning execution has ended and no Glue job is still running.
 - **Publish only what was verified.** Data-quality rules gate Silver. The completion marker is
-  written only after this run's crawl succeeds. The dashboard checks the lock and the marker before
-  and after it reads, and refuses stale or in-progress data.
-- **Atomic Gold with Apache Iceberg (in progress).** Gold is also written to Iceberg in shadow
-  mode, one atomic commit per table and day, and compared with Parquet each day. Readers switch
-  after several matching days, and the crawler, about 44% of Glue cost per run, goes away.
+  written only from a Gold version record that matches this run. The dashboard checks the lock and
+  the marker before and after it reads, and refuses stale or in-progress data.
+- **Atomic, pinned Gold with Apache Iceberg.** Each table replaces its day in one commit, and the
+  completion marker pins the three snapshot ids, so readers query one consistent set with
+  `FOR VERSION AS OF`. The migration ran in shadow mode first and was compared with the old
+  Parquet Gold row by row; it also removed the crawler, about 44% of Glue cost per run.
 - **Least privilege, checked in CI.** Each stage runs under its own IAM role and the dashboard
   assumes a read-only role. Checkov runs on every pull request with zero open findings; each
   accepted one carries a written reason next to the resource.
@@ -143,8 +145,8 @@ Tests mock the source APIs and AWS clients; dated AWS evidence lives in [docs/ev
 - Role families come from job-title rules, one family per posting. Work mode depends on what each
   source states, and about 45% of postings state none; those are reported as "not stated".
 - Arbeitnow is read two pages deep and flagged as incomplete.
-- Until readers switch to Iceberg, the three Gold marts are not committed in one transaction;
-  the publication checks guard the reader instead.
+- The three Gold tables commit separately; readers stay consistent through the pinned snapshot
+  ids rather than one multi-table transaction.
 - Glue and supporting services cost money even when credits cover them, and budget alerts do not
   cap spending. Read [cost and security](docs/cost-and-security.md) and
   [cleanup](docs/operations.md#cleanup--kết-thúc-lab) before deploying or retiring a copy.

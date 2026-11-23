@@ -31,7 +31,7 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         # The simulator asks for keys from unrelated statements too. Supply a complete
         # context so negative cases cannot pass merely because a condition key is absent.
         context_by_name = {
-            "s3:prefix": context_entry("s3:prefix", ["gold/fact_job_posting/"]),
+            "s3:prefix": context_entry("s3:prefix", ["gold_iceberg/fact_job_posting/"]),
             "cloudwatch:namespace": context_entry(
                 "cloudwatch:namespace", ["JobMarket/Pipeline" if name == "health-monitor" else "Glue"]),
             "dynamodb:LeadingKeys": context_entry("dynamodb:LeadingKeys", ["pipeline"], "stringList"),
@@ -46,41 +46,40 @@ def verify(session, project, lake, scripts, results, database, workgroup):
         checks.append({"role": name, "action": action, "resource": resource,
                        "expected": "allowed" if allowed else "denied", "decision": actual,
                        "missing_context": response.get("MissingContextValues", []), "passed": passed})
-    for name in ["ingestion", "silver", "gold", "crawler", "health-monitor", "dashboard-reader", "lock-janitor"]:
+    for name in ["ingestion", "silver", "gold", "health-monitor", "dashboard-reader", "lock-janitor"]:
         check(name, "s3:PutObject", obj(scripts, "jobs/silver_to_gold.py"), False)
         check(name, "s3:DeleteObject", obj(lake, "bronze/run_id=probe/source=x/board=y/jobs.json"), False)
         check(name, "s3:PutObject", obj(lake, "state/pipeline/latest.json"), False)
     check("ingestion", "s3:PutObject", obj(lake, "bronze/run_id=probe/source=x/board=y/jobs.json"), True)
-    check("ingestion", "s3:PutObject", obj(lake, "gold/fact_job_posting/probe.parquet"), False)
+    # Gold is Apache Iceberg under gold_iceberg/ (tables in the _iceberg database). The legacy
+    # Parquet gold/ prefix is read-only history: no runtime role may write it any more.
+    iceberg_db = f"{database}_iceberg"
+    gold_file = "gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet"
+    check("ingestion", "s3:PutObject", obj(lake, gold_file), False)
     for name, prefix, opposite in [
-        ("silver", "silver/runs/probe/jobs/x.parquet", "gold/fact_job_posting/x.parquet"),
-        ("gold", "gold/fact_job_posting/snapshot_date=2026-09-30/x.parquet", "silver/runs/probe/jobs/x.parquet"),
+        ("silver", "silver/runs/probe/jobs/x.parquet", gold_file),
+        ("gold", gold_file, "silver/runs/probe/jobs/x.parquet"),
     ]:
         for action in ["s3:PutObject", "s3:DeleteObject"]:
             check(name, action, obj(lake, prefix), True)
             check(name, action, obj(lake, opposite), False)
         check(name, "glue:UpdateJob", f"arn:aws:glue:{region}:{account}:job/{project}-silver-to-gold", False)
-    for mart in ["fact_job_posting", "demand_by_role", "role_opportunity"]:
-        check("gold", "s3:PutObject", obj(lake, "gold/" + mart + "_$folder$"), True)
-    check("gold", "s3:PutObject", obj(lake, "gold/other_$folder$"), False)
     check("silver", "s3:PutObject", obj(lake, "state/silver/latest.json"), True)
-    # Shadow Iceberg Gold (task 5.1 phase A): only the Gold job writes it and its outcome record.
-    iceberg_db = f"{database}_iceberg"
-    check("gold", "s3:PutObject", obj(lake, "gold_iceberg/fact_job_posting/data/x.parquet"), True)
+    check("gold", "s3:PutObject", obj(lake, "gold/fact_job_posting/snapshot_date=2026-11-23/x.parquet"), False)
     check("gold", "s3:PutObject", obj(lake, "state/gold_iceberg/run_id=probe.json"), True)
     check("gold", "glue:UpdateTable", arn("glue", f"table/{iceberg_db}/fact_job_posting"), True)
     check("gold", "glue:UpdateTable", arn("glue", f"table/{database}/fact_job_posting"), False)
-    for name in ["silver", "crawler", "ingestion"]:
-        check(name, "s3:PutObject", obj(lake, "gold_iceberg/fact_job_posting/data/x.parquet"), False)
-    check("crawler", "s3:GetObject", obj(lake, "gold/fact_job_posting/x.parquet"), True)
-    check("crawler", "s3:PutObject", obj(lake, "gold/fact_job_posting/x.parquet"), False)
-    check("crawler", "s3:GetObject", obj(lake, "bronze/x.json"), False)
     check("sfn", "s3:PutObject", obj(lake, "state/pipeline/latest.json"), True)
-    check("sfn", "s3:PutObject", obj(lake, "gold/fact_job_posting/x.parquet"), False)
-    check("dashboard-reader", "s3:GetObject", obj(lake, "gold/fact_job_posting/x.parquet"), True)
+    check("sfn", "s3:GetObject", obj(lake, "state/gold_iceberg/run_id=probe.json"), True)
+    check("sfn", "s3:PutObject", obj(lake, gold_file), False)
+    check("sfn", "glue:StartCrawler", arn("glue", f"crawler/{project}-gold-crawler"), False)
+    check("dashboard-reader", "s3:GetObject", obj(lake, gold_file), True)
+    iceberg_metadata = "gold_iceberg/fact_job_posting/metadata/v1.metadata.json"
+    check("dashboard-reader", "s3:GetObject", obj(lake, iceberg_metadata), True)
+    check("dashboard-reader", "glue:GetTable", arn("glue", f"table/{iceberg_db}/fact_job_posting"), True)
     check("dashboard-reader", "s3:GetObject", obj(lake, "state/pipeline/latest.json"), True)
     check("dashboard-reader", "s3:GetObject", obj(lake, "bronze/x.json"), False)
-    check("dashboard-reader", "s3:PutObject", obj(lake, "gold/fact_job_posting/x.parquet"), False)
+    check("dashboard-reader", "s3:PutObject", obj(lake, gold_file), False)
     check("dashboard-reader", "s3:PutObject", obj(results, "results/query.csv"), True)
     check("dashboard-reader", "glue:StartJobRun", f"arn:aws:glue:{region}:{account}:job/{project}-ingestion", False)
     check("dashboard-reader", "athena:StartQueryExecution", arn("athena", f"workgroup/{workgroup}"), True)
