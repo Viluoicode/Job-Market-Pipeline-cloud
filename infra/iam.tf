@@ -1,6 +1,6 @@
 # ============================================================================================
 # IAM — shared Glue trust policy and the Step Functions role. Per-stage runtime roles (Silver,
-# Gold, crawler, dashboard reader) live in iam_runtime.tf.
+# Gold, dashboard reader) live in iam_runtime.tf.
 # ============================================================================================
 
 # ---- Glue trust policy (shared by the stage roles in iam_runtime.tf) --------------------------
@@ -51,9 +51,9 @@ data "aws_iam_policy_document" "sfn_policy" {
     ]
   }
   statement {
-    sid       = "RunGlueCrawler"
-    actions   = ["glue:StartCrawler", "glue:GetCrawler"]
-    resources = [aws_glue_crawler.gold.arn]
+    sid       = "ReadGoldVersions"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.lake.arn}/state/gold_iceberg/*"]
   }
   statement {
     sid       = "SerializePipeline"

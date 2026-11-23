@@ -14,8 +14,9 @@ from model import DEFAULT_ROLES, ROLE_EXCLUDE, ROLE_FAMILIES, classify, remote_l
 
 
 def publication():
-    completion = {"run_id": "run-1", "snapshot_date": "2026-09-27", "completed_at": "2026-09-27T18:08:00Z"}
-    silver = dict(completion)
+    completion = {"run_id": "run-1", "snapshot_date": "2026-09-27", "completed_at": "2026-09-27T18:08:00Z",
+                  "iceberg_snapshots": {"fact_job_posting": {"snapshot_id": "811978490607233390", "rows": 2}}}
+    silver = {"run_id": "run-1", "snapshot_date": "2026-09-27"}
     manifest = dict(completion, status="SUCCEEDED", total_records=2, successful_boards=2, failed_boards=0,
                     boards=[{"status": "SUCCEEDED", "complete": True}, {"status": "SUCCEEDED", "complete": False}])
     return completion, silver, manifest
@@ -25,6 +26,17 @@ def test_current_publication_and_incomplete_coverage():
     result = data.validate_publication(*publication(), now=datetime(2026, 9, 28, tzinfo=timezone.utc))
     assert result["incomplete_boards"] == 1
     assert result["snapshot_date"] == "2026-09-27"
+    # Kept as text: Iceberg snapshot ids exceed 2**53 and must not pass through a float.
+    assert result["fact_snapshot_id"] == "811978490607233390"
+
+
+@pytest.mark.parametrize("snapshots", [None, {}, {"fact_job_posting": {}},
+                                       {"fact_job_posting": {"snapshot_id": "12; DROP TABLE x"}}])
+def test_publication_must_pin_a_valid_gold_table_version(snapshots):
+    c, s, m = publication()
+    c["iceberg_snapshots"] = snapshots
+    with pytest.raises(data.PublicationUnavailable, match="version"):
+        data.validate_publication(c, s, m, now=datetime(2026, 9, 28, tzinfo=timezone.utc))
 
 
 @pytest.mark.parametrize("kind", ["run", "date", "failed", "stale", "future"])
@@ -53,7 +65,7 @@ def test_writer_lock_blocks_reads():
 
 
 def test_republication_during_query_is_rejected(monkeypatch):
-    reads = iter([({"snapshot_date": "2026-09-27"}, ("old",)), ({}, ("new",))])
+    reads = iter([({"snapshot_date": "2026-09-27", "fact_snapshot_id": "7"}, ("old",)), ({}, ("new",))])
     monkeypatch.setattr(data, "read_publication", lambda *a: next(reads))
     monkeypatch.setattr(data, "query_fact", lambda *a: ([{}], {}))
     with pytest.raises(data.PublicationUnavailable, match="changed"):
@@ -69,13 +81,18 @@ def test_pagination_does_not_drop_second_page_first_record():
     athena.get_paginator.return_value.paginate.return_value = [
         {"ResultSet": {"Rows": [row("job_id", "is_remote"), row("1", "true")]}},
         {"ResultSet": {"Rows": [row("2", "false"), {"Data": [{"VarCharValue": "3"}, {}]}]}}]
-    records, _ = data.query_fact(session, "db", "wg", "2026-09-27")
+    records, _ = data.query_fact(session, "db", "wg", "2026-09-27", "811978490607233390")
     assert records == [{"job_id": "1", "is_remote": True}, {"job_id": "2", "is_remote": False},
                        {"job_id": "3", "is_remote": None}]          # Athena omits VarCharValue for NULL
     sql = athena.start_query_execution.call_args.kwargs["QueryString"]
-    assert "snapshot_date = '2026-09-27'" in sql
+    # One pinned Iceberg version, one day; timestamps rendered to milliseconds in UTC as before.
+    assert "FROM fact_job_posting FOR VERSION AS OF 811978490607233390" in sql
+    assert "snapshot_date = DATE '2026-09-27'" in sql
+    assert "format_datetime(last_seen_at, 'yyyy-MM-dd HH:mm:ss.SSS') AS last_seen_at" in sql
     with pytest.raises(data.PublicationUnavailable, match="limit"):
-        data.query_fact(session, "db", "wg", "2026-09-27", max_rows=1)
+        data.query_fact(session, "db", "wg", "2026-09-27", "811978490607233390", max_rows=1)
+    with pytest.raises(ValueError, match="version"):
+        data.query_fact(session, "db", "wg", "2026-09-27", "1 OR 1=1")
 
 
 def _gold_constant(name):

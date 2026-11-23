@@ -70,16 +70,10 @@
                 <mxCell id="silverS" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;verticalLabelPosition=bottom;verticalAlign=top;align=center;" value="silver/&lt;br&gt;immutable runs" vertex="1">
                     <mxGeometry height="60" width="60" x="740" y="500" as="geometry"/>
                 </mxCell>
-                <mxCell id="goldS" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;verticalLabelPosition=bottom;verticalAlign=top;align=center;" value="gold/&lt;br&gt;Parquet marts" vertex="1">
-                    <mxGeometry height="60" width="60" x="1080" y="500" as="geometry"/>
-                </mxCell>
                 <mxCell id="ctrl" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;labelPosition=right;verticalLabelPosition=middle;align=left;verticalAlign=middle;" value="control/&lt;br&gt;state/" vertex="1">
                     <mxGeometry height="60" width="60" x="1260" y="500" as="geometry"/>
                 </mxCell>
-                <mxCell id="crawler" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.glue_crawlers;" value="Glue Crawler&lt;br&gt;(gold/ only)" vertex="1">
-                    <mxGeometry height="60" width="60" x="260" y="740" as="geometry"/>
-                </mxCell>
-                <mxCell id="catalog" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.glue_data_catalog;" value="Glue Data Catalog&lt;br&gt;(schema + partitions)" vertex="1">
+                <mxCell id="catalog" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#8C4FFF;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=11;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.glue_data_catalog;" value="Glue Data Catalog&lt;br&gt;(Iceberg tables)" vertex="1">
                     <mxGeometry height="60" width="55.38" x="480" y="740" as="geometry"/>
                 </mxCell>
                 <mxCell id="athena" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.athena;fillColor=#8C4FFF;labelPosition=left;verticalLabelPosition=bottom;align=right;verticalAlign=top;" value="Athena workgroup&lt;br&gt;(scan cutoff / query)" vertex="1">
@@ -103,7 +97,7 @@
                 <mxCell id="iam" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.identity_and_access_management;fillColor=#DD344C;verticalLabelPosition=bottom;verticalAlign=top;align=center;" value="IAM roles + STS" vertex="1">
                     <mxGeometry height="60" width="60" x="1510" y="190" as="geometry"/>
                 </mxCell>
-                <mxCell id="iamlist" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=10;fontColor=#232F3E;" value="&lt;b&gt;One role per workload&lt;/b&gt;&lt;br&gt;• ingestion-role&lt;br&gt;• silver-role&lt;br&gt;• gold-role&lt;br&gt;• crawler-role&lt;br&gt;• sfn-role&lt;br&gt;• events role (EB → SFN)&lt;br&gt;• health-monitor role&lt;br&gt;• dashboard-reader-role&lt;br&gt;&amp;nbsp;&amp;nbsp;(AssumeRole, read-only)" vertex="1">
+                <mxCell id="iamlist" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=top;fontSize=10;fontColor=#232F3E;" value="&lt;b&gt;One role per workload&lt;/b&gt;&lt;br&gt;• ingestion-role&lt;br&gt;• silver-role&lt;br&gt;• gold-role&lt;br&gt;• sfn-role&lt;br&gt;• events role (EB → SFN)&lt;br&gt;• health-monitor role&lt;br&gt;• dashboard-reader-role&lt;br&gt;&amp;nbsp;&amp;nbsp;(AssumeRole, read-only)" vertex="1">
                     <mxGeometry height="170" width="180" x="1455" y="285" as="geometry"/>
                 </mxCell>
                 <mxCell id="budget" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;resIcon=mxgraph.aws4.budgets_2;fillColor=#7AA116;verticalLabelPosition=top;verticalAlign=bottom;align=center;" value="AWS Budgets&lt;br&gt;monthly, alert at 80%" vertex="1">
@@ -144,17 +138,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e7" edge="1" parent="1" source="sfn" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;dashed=1;strokeColor=#1F6FD1;fontColor=#1F6FD1;strokeWidth=1.5;horizontal=0;exitX=0;exitY=0.85;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="crawler" value="④ start + poll crawler">
-                    <mxGeometry relative="1" x="0.45" as="geometry">
-                        <Array as="points">
-                            <mxPoint x="440" y="241"/>
-                            <mxPoint x="440" y="300"/>
-                            <mxPoint x="190" y="300"/>
-                            <mxPoint x="190" y="770"/>
-                        </Array>
-                    </mxGeometry>
-                </mxCell>
-                <mxCell id="e8" edge="1" parent="1" source="sfn" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;dashed=1;strokeColor=#1F6FD1;fontColor=#1F6FD1;strokeWidth=1.5;exitX=1;exitY=0.85;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="ctrl" value="⑤ publish completion marker (after verified crawl)">
+                <mxCell id="e8" edge="1" parent="1" source="sfn" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;dashed=1;strokeColor=#1F6FD1;fontColor=#1F6FD1;strokeWidth=1.5;exitX=1;exitY=0.85;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="ctrl" value="④ check version record, publish marker + snapshot ids">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="570" y="241"/>
@@ -209,24 +193,7 @@
                         </Array>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="e17" edge="1" parent="1" source="gj" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=9;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="goldS" value="write marts">
-                    <mxGeometry relative="1" as="geometry">
-                        <Array as="points">
-                            <mxPoint x="930" y="470"/>
-                            <mxPoint x="1110" y="470"/>
-                        </Array>
-                    </mxGeometry>
-                </mxCell>
-                <mxCell id="e18" edge="1" parent="1" source="goldS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=0;exitY=0.75;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="crawler" value="crawl gold/">
-                    <mxGeometry relative="1" as="geometry">
-                        <Array as="points">
-                            <mxPoint x="1000" y="545"/>
-                            <mxPoint x="1000" y="655"/>
-                            <mxPoint x="290" y="655"/>
-                        </Array>
-                    </mxGeometry>
-                </mxCell>
-                <mxCell id="e19" edge="1" parent="1" source="goldS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=0;exitY=0.25;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="athena" value="scan Parquet">
+                <mxCell id="e19" edge="1" parent="1" source="icebergS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=0;exitY=0.25;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" target="athena" value="scan pinned Iceberg version">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="1020" y="515"/>
@@ -234,9 +201,6 @@
                             <mxPoint x="730" y="675"/>
                         </Array>
                     </mxGeometry>
-                </mxCell>
-                <mxCell id="e20" edge="1" parent="1" source="crawler" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;" target="catalog" value="register">
-                    <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="e22" edge="1" parent="1" source="athena" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;entryPerimeter=0;" target="results" value="results">
                     <mxGeometry relative="1" as="geometry"/>
@@ -329,7 +293,7 @@
                         <mxPoint x="235" y="1070" as="targetPoint"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="l2t" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" value="Control (trigger / orchestrate), ⓪–⑤ = run order" vertex="1">
+                <mxCell id="l2t" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;" value="Control (trigger / orchestrate), ⓪–④ = run order" vertex="1">
                     <mxGeometry height="20" width="310" x="245" y="1060" as="geometry"/>
                 </mxCell>
                 <mxCell id="l3" edge="1" parent="1" style="endArrow=block;endFill=1;html=1;dashed=1;dashPattern=1 3;strokeColor=#5A6C86;strokeWidth=1.5;" value="">
@@ -359,13 +323,22 @@
                         <mxPoint y="-14" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="icebergS" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;verticalLabelPosition=bottom;verticalAlign=top;align=center;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;" value="gold_iceberg/&lt;br&gt;Iceberg (shadow)" vertex="1">
+                <mxCell id="icebergS" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;strokeColor=#ffffff;dashed=0;html=1;fontSize=11;aspect=fixed;shape=mxgraph.aws4.resourceIcon;verticalLabelPosition=bottom;verticalAlign=top;align=center;resIcon=mxgraph.aws4.s3;fillColor=#7AA116;" value="gold_iceberg/&lt;br&gt;Iceberg tables" vertex="1">
                     <mxGeometry height="60" width="60" x="1170" y="500" as="geometry"/>
                 </mxCell>
-                <mxCell id="e_iceberg" edge="1" parent="1" source="gj" target="icebergS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=9;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" value="shadow write (atomic per table)">
+                <mxCell id="e_iceberg" edge="1" parent="1" source="gj" target="icebergS" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=9;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=1;exitY=0.5;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" value="commit marts (atomic per table)">
                     <mxGeometry relative="1" as="geometry">
                         <Array as="points">
                             <mxPoint x="1200" y="420"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+            
+                <mxCell id="e_catalog" edge="1" parent="1" source="gj" target="catalog" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;jumpStyle=arc;jumpSize=8;fontSize=10;labelBackgroundColor=#ffffff;endArrow=block;endFill=1;strokeColor=#232F3E;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;entryPerimeter=0;" value="create / update tables">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="930" y="700"/>
+                            <mxPoint x="507" y="700"/>
                         </Array>
                     </mxGeometry>
                 </mxCell>

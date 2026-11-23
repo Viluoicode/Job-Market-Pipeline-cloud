@@ -1,4 +1,4 @@
-"""Gold's Iceberg writer (silver_to_gold.write_iceberg) and its shadow-mode wrapper.
+"""Gold's Iceberg writer (silver_to_gold.write_iceberg) and the publish step around it.
 
 The Iceberg test runs real Apache Iceberg in a child process (the shared test SparkSession has no
 Iceberg jar) against an in-memory catalog, so it needs no filesystem, Hadoop binaries or AWS.
@@ -26,37 +26,37 @@ class Mart:
         return self.rows
 
 
-def test_shadow_write_records_snapshot_ids_and_row_counts():
+def test_publish_records_snapshot_ids_as_text_and_row_counts():
     calls = []
 
     def writer(df, table, snapshot_date):
         calls.append((table, snapshot_date))
-        return 1000 + len(calls)
+        return 811978490607233390 + len(calls)      # real ids exceed 2**53
 
-    record = s2g.shadow_write_iceberg(
+    record = s2g.publish_iceberg(
         [("glue_catalog.gold_iceberg.fact_job_posting", Mart(8)), ("glue_catalog.gold_iceberg.demand_by_role", Mart(3))],
         run_id="run-1", snapshot_date="2026-11-21", writer=writer)
     assert record == {
-        "run_id": "run-1", "snapshot_date": "2026-11-21", "mode": "shadow", "status": "SUCCEEDED",
-        "tables": {"fact_job_posting": {"snapshot_id": 1001, "rows": 8},
-                   "demand_by_role": {"snapshot_id": 1002, "rows": 3}},
+        "run_id": "run-1", "snapshot_date": "2026-11-21", "status": "SUCCEEDED",
+        "tables": {"fact_job_posting": {"snapshot_id": "811978490607233391", "rows": 8},
+                   "demand_by_role": {"snapshot_id": "811978490607233392", "rows": 3}},
     }
 
 
-def test_shadow_write_failure_is_recorded_not_raised():
-    # Shadow mode must never break the published Parquet path.
+def test_publish_failure_fails_the_job():
+    # Iceberg is the published Gold now: a failed commit must stop the run (lock released, alarm).
     def writer(df, table, snapshot_date):
-        if table.endswith("demand_by_role"):
-            raise RuntimeError("AccessDenied: glue:UpdateTable")
-        return 7
+        raise RuntimeError("AccessDenied: glue:UpdateTable")
 
-    record = s2g.shadow_write_iceberg(
-        [("c.db.fact_job_posting", Mart(8)), ("c.db.demand_by_role", Mart(3)), ("c.db.role_opportunity", Mart(2))],
-        run_id="run-1", snapshot_date="2026-11-21", writer=writer)
-    assert record["status"] == "FAILED"
-    assert record["failed_table"] == "demand_by_role"
-    assert record["error_type"] == "RuntimeError" and "glue:UpdateTable" in record["error"]
-    assert record["tables"] == {"fact_job_posting": {"snapshot_id": 7, "rows": 8}}   # stops at the failure
+    with pytest.raises(RuntimeError, match="UpdateTable"):
+        s2g.publish_iceberg([("c.db.fact_job_posting", Mart(8))], run_id="run-1",
+                            snapshot_date="2026-11-21", writer=writer)
+
+
+def test_publish_requires_a_committed_snapshot():
+    with pytest.raises(ValueError, match="snapshot"):
+        s2g.publish_iceberg([("c.db.fact_job_posting", Mart(0))], run_id="run-1",
+                            snapshot_date="2026-11-21", writer=lambda df, table, day: None)
 
 
 ICEBERG_SCRIPT = textwrap.dedent("""

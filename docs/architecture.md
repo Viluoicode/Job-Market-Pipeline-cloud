@@ -53,14 +53,14 @@ flowchart TD
     SILVER --> SILVER_STATE[Silver latest pointer]
     SILVER_RUN --> GOLD[Glue Spark: active/fresh Gold marts]
     SILVER_STATE -. select committed run .-> GOLD
-    GOLD --> GOLD_DATA[S3 Gold marts]
-    SFN -. start and verify .-> CRAWLER[Glue Crawler]
-    GOLD_DATA --> CRAWLER
-    CRAWLER --> CATALOG[Glue Data Catalog]
+    GOLD --> GOLD_DATA[S3 Gold: Apache Iceberg tables]
+    GOLD --> CATALOG[Glue Data Catalog]
+    GOLD --> VERSIONS[Gold version record]
     CATALOG --> ATHENA[Athena workgroup]
     GOLD_DATA --> ATHENA
     ATHENA --> RESULTS[S3 Athena results]
-    SFN -. after verified crawl .-> COMPLETE[Pipeline completion marker]
+    VERSIONS -. checked by .-> SFN
+    SFN -. with Iceberg snapshot ids .-> COMPLETE[Pipeline completion marker]
 
     MONITOR_SCHEDULE[EventBridge every 15 minutes] --> MONITOR[Lambda health monitor]
     MANIFEST --> MONITOR
@@ -76,7 +76,7 @@ flowchart TD
 
 Solid arrows primarily show data/metadata movement; dashed arrows label control or metric paths.
 Step Functions conditionally releases its DynamoDB lock after publication or caught failure;
-after an abort/timeout the lock janitor releases it once Glue and the crawler are idle
+after an abort/timeout the lock janitor releases it once the pipeline's Glue jobs are idle
 ([runbook](operations.md)).
 
 The state machine is the only authorized production write path. A run identifier and the UTC date
@@ -92,8 +92,8 @@ of the execution are fixed at workflow start and passed to every stage.
 | Glue Python Shell | Fetch and canonicalize source records and commit the run manifest |
 | S3 lake | Store Bronze, Silver, Gold, quality, and control/state objects |
 | Glue Bronze-to-Silver | Validate the run, reconcile lifecycle, and enforce data quality |
-| Glue Silver-to-Gold | Select active/fresh records and build analytical marts |
-| Glue Crawler and Catalog | Register the current Gold schema and partitions |
+| Glue Silver-to-Gold | Build the marts and commit them to Iceberg, one atomic commit per table |
+| Glue Data Catalog | Hold the Iceberg tables the Gold job creates and updates (no crawler) |
 | Athena | Provide serverless SQL access with a per-query scan limit |
 | Lambda health monitor | Independently evaluate publication freshness and source coverage |
 | Lambda lock janitor | Release an orphaned writer lock only after its execution and all Glue work ended |
@@ -153,21 +153,23 @@ Silver writes an immutable run, persists the data-quality result, and then advan
 `state/silver/latest.json`. Gold reads that exact committed run and replaces only the requested
 UTC `snapshot_date` partition, including when output is empty.
 
-Publication across the three Gold marts is not transactional. The crawler must report a successful
-crawl belonging to the current execution before `state/pipeline/latest.json` is written. Consumers
-must validate matching Silver and pipeline run IDs plus wall-clock freshness before treating the
-latest partition as complete.
+Gold is three Apache Iceberg tables in the `<gold database>_iceberg` Glue database, with data and
+metadata under `s3://<lake>/gold_iceberg/`. Each table commit is atomic and replaces exactly one
+`snapshot_date`, also when the mart is empty, so a reader sees the previous or the new version,
+never a half-written day. The Gold job creates and updates the tables itself; their schema comes
+from code, and there is no crawler.
 
-**Iceberg migration (in progress, phase A: shadow).** The Gold job also writes the three marts to
-Apache Iceberg tables in the `<gold database>_iceberg` database under `s3://<lake>/gold_iceberg/`.
-Each table commit is atomic and replaces exactly one `snapshot_date` (also when the mart is empty),
-so a reader sees the previous or the new snapshot, never a half-written day; schema comes from code,
-not a crawler. Parquet remains the published contract: an Iceberg failure is recorded in
-`state/gold_iceberg/run_id=<run>.json` and does not fail the run. `scripts/compare_iceberg.py`
-checks row counts of all three marts and row-level equality of the fact table. Phase B, after
-several matching days, moves the dashboard to Iceberg, records each table's snapshot id in the
-completion marker so the three marts are read at one consistent version (Iceberg is atomic per
-table, not across tables), and removes the crawler.
+Iceberg is atomic per table, not across the three marts. So after its three commits the Gold job
+writes `state/gold_iceberg/run_id=<run>.json` with each table's new snapshot id (as text: ids
+exceed 2^53). Step Functions checks that this record belongs to the run, then copies the ids into
+`state/pipeline/latest.json`. Readers query `FOR VERSION AS OF <snapshot id>`, so they read one
+consistent set even if a later run commits meanwhile. Consumers must still validate matching
+Silver and pipeline run IDs plus wall-clock freshness before treating a snapshot as current.
+
+History: until November 2026 Gold was plain Parquet under `gold/`, registered by a crawler. Iceberg
+ran in shadow mode for several days, compared with Parquet by `scripts/compare_iceberg.py`
+([evidence](evidence/README.md)), before readers switched and the crawler was removed. The Parquet
+files and their `jobmarket_aws_gold` tables are kept as read-only history.
 
 The date boundary is UTC. For example, a run at 01:00 on 17 September in UTC+7 starts at 18:00 on
 16 September UTC and therefore publishes `snapshot_date=2026-09-16`.
@@ -194,7 +196,8 @@ source sample and must not be presented as the whole labor market.
   in the ~1 GB Python Shell, and a storage error still aborts the run.
 - A committed ingestion run can be read again without changing its observation time.
 - Silver state advances only after validation, data quality, and Parquet output succeed.
-- The crawler is verified by status and start time, not merely by returning to `READY`.
+- Completion is published only from a Gold version record that matches the run and names all
+  three tables.
 - The workflow has a 90-minute ceiling; Glue stages have independent timeouts.
 - Aborted or timed-out external jobs must be confirmed stopped before an orphaned lock is removed;
   the lock janitor automates this check and releases the lock conditionally on its owner.
@@ -208,14 +211,14 @@ source sample and must not be presented as the whole labor market.
   role or responsibility.
 - The health monitor can read control metadata, write its own logs, and publish project metrics;
   it cannot mutate the lake or start a pipeline execution.
-- The lock janitor can read execution/job-run/crawler status and delete only the pipeline lock
+- The lock janitor can read execution and job-run status and delete only the pipeline lock
   key; it cannot start or stop executions or Glue jobs.
 - Athena uses an enforced workgroup result location and a 10 GiB scan cutoff.
 
 Security controls are defined mainly in `infra/s3.tf`, `infra/iam.tf`, `infra/ingestion.tf`,
 `infra/schedule.tf`, `infra/monitoring.tf`, `infra/lock_janitor.tf`, and `infra/athena.tf`.
 
-Silver, Gold and the crawler use separate custom IAM roles. Runtime roles cannot modify scripts;
+Silver and Gold use separate custom IAM roles. Runtime roles cannot modify scripts;
 Step Functions alone among pipeline runtime roles writes the completion marker. The dashboard
 assumes a dedicated reader role for every AWS data-access session. All three buckets enforce HTTPS
 for non-service principals. Ownership and lake/scripts versioning are managed by Terraform.
@@ -247,16 +250,17 @@ opt-in via allow_bucket_force_destroy.
 - **Glue Spark for lifecycle transforms:** the implementation uses DataFrame operations, Parquet,
   and Glue Data Quality while remaining managed.
 - **Step Functions instead of a scheduler-only chain:** the workflow needs ownership, waits,
-  retries, crawl verification, and failure cleanup across AWS services.
+  retries, publication checks, and failure cleanup across AWS services.
 - **DynamoDB lock instead of a time-based lock:** a TTL could expire while an external Glue task
   still writes, allowing corruption through concurrent runs. The lock janitor releases by
-  evidence (owner ended, Glue/crawler idle), not by elapsed time.
+  evidence (owner ended, Glue jobs idle), not by elapsed time.
 - **Daily schedule:** it balances freshness with Glue cost for this portfolio-scale source set.
 - **Athena instead of Redshift:** current SQL volume does not justify a dedicated warehouse.
 - **Step Functions instead of MWAA:** this AWS batch workflow does not currently justify
   operating an Airflow environment.
-- **Iceberg behind a shadow phase:** the table format changes how every reader sees Gold, so both
-  formats run side by side and are compared before readers switch; rollback is a no-op.
+- **Apache Iceberg for Gold, introduced behind a shadow phase:** atomic per-table commits and
+  pinned versions replace partition overwrites and a crawler. Because the format changes how every
+  reader sees Gold, both formats first ran side by side and were compared row by row.
 - **Separate health monitor:** successful orchestration alone does not prove fresh, internally
   consistent, or sufficiently covered data.
 
@@ -266,7 +270,7 @@ opt-in via allow_bucket_force_destroy.
 | --- | --- |
 | Storage, encryption, and lifecycle | `infra/s3.tf` |
 | Ingestion job, source catalog, and lock | `infra/ingestion.tf` |
-| Spark jobs, database, and crawler | `infra/glue.tf` |
+| Spark jobs and Gold databases | `infra/glue.tf` |
 | Script uploads and shared contract | `infra/scripts_upload.tf` |
 | Orchestration and completion marker | `infra/stepfunctions.tf` |
 | Runtime permissions | `infra/iam.tf`, `infra/iam_runtime.tf`, `infra/ingestion.tf`, `infra/schedule.tf`, `infra/monitoring.tf`, `infra/lock_janitor.tf` |
@@ -279,8 +283,8 @@ opt-in via allow_bucket_force_destroy.
 ## Known limitations
 
 - Arbeitnow pagination is capped at two pages and is marked incomplete when more pages exist.
-- Gold marts are not committed through a single storage transaction. Iceberg (phase A) makes each
-  table commit atomic; cross-mart consistency comes in phase B through recorded snapshot ids.
+- The three Gold tables commit separately; readers get a consistent set through the snapshot ids
+  in the completion marker, not through one multi-table transaction.
 - Role classification uses title rules rather than a trained semantic classifier.
 - Remote status depends on source metadata quality.
 - Lifecycle history from the current method begins with the September 2026 migration; earlier
@@ -293,9 +297,9 @@ interpretation limits.
 
 `dashboard/data_access.py` checks the DynamoDB writer lock, matching Silver/completion/manifest
 identities, snapshot dates and ingestion age (maximum 26 hours). It reads only the published fact
-partition, then checks again. Cached results include S3 metadata fingerprints in their key.
+version (`FOR VERSION AS OF` the snapshot id in the completion marker), then checks again. Cached results include S3 metadata fingerprints in their key.
 An in-progress, stale, failed or changed publication blocks display; no fallback to MAX(date).
-This is a conservative reader safeguard, not an atomic transaction over Gold. A run may begin
+This is a conservative reader safeguard; the pinned version keeps the read itself consistent. A run may begin
 after a page is rendered; the page is a point-in-time view and idle pages do not auto-refresh.
 
 The UI runs on the presenter's laptop and reads AWS; it is not publicly hosted. Stopping the UI

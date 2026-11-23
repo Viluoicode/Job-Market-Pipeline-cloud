@@ -25,7 +25,7 @@ resource "aws_athena_workgroup" "main" {
 resource "aws_athena_named_query" "inspect_today_jobs" {
   name        = "Jobs observed today (Vietnam)"
   description = "Inspect today's actual observations in the latest Gold snapshot; timestamps shown in UTC and Vietnam time."
-  database    = aws_glue_catalog_database.gold.name
+  database    = aws_glue_catalog_database.gold_iceberg.name
   workgroup   = aws_athena_workgroup.main.name
   query       = file("${path.module}/../sql/inspect_today_jobs.sql")
 }

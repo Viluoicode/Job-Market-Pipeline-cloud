@@ -1,7 +1,7 @@
 """Unit tests for the lock janitor Lambda (monitoring/lock_janitor.py).
 
 The janitor releases the DynamoDB writer lock only when it is provably orphaned: its owner
-execution has ended AND no Glue job run / crawl that could still be writing is active. Every
+execution has ended AND no Glue job run that could still be writing is active. Every
 "not safe yet" case must leave the lock untouched so the next sweep can retry.
 """
 import importlib.util
@@ -18,7 +18,6 @@ spec.loader.exec_module(janitor)
 SM_ARN = "arn:aws:states:ap-southeast-1:123456789012:stateMachine:jobmarket-aws-pipeline"
 OWNER = "arn:aws:states:ap-southeast-1:123456789012:execution:jobmarket-aws-pipeline:run-1"
 JOBS = ["jobmarket-aws-ingestion", "jobmarket-aws-bronze-to-silver", "jobmarket-aws-silver-to-gold"]
-CRAWLER = "jobmarket-aws-gold-crawler"
 
 
 class DynamoDB:
@@ -52,9 +51,8 @@ class StepFunctions:
 
 
 class Glue:
-    def __init__(self, active=None, crawler_state="READY"):
+    def __init__(self, active=None):
         self.active = active or {}          # job name -> JobRunState of its newest run
-        self.crawler_state = crawler_state
 
     def get_job_runs(self, JobName, MaxResults):
         runs = [{"Id": "jr_old", "JobRunState": "SUCCEEDED"}]
@@ -62,14 +60,10 @@ class Glue:
             runs.insert(0, {"Id": "jr_new", "JobRunState": self.active[JobName]})
         return {"JobRuns": runs}
 
-    def get_crawler(self, Name):
-        assert Name == CRAWLER
-        return {"Crawler": {"Name": Name, "State": self.crawler_state}}
-
 
 def sweep(ddb, sfn=None, glue=None):
     return janitor.sweep(ddb, sfn or StepFunctions(), glue or Glue(), table="lock",
-                         state_machine_arn=SM_ARN, job_names=JOBS, crawler_name=CRAWLER)
+                         state_machine_arn=SM_ARN, job_names=JOBS)
 
 
 def test_no_lock_is_a_noop():
@@ -114,12 +108,10 @@ def test_active_glue_run_blocks_release(state):
     assert ddb.deletes == []
 
 
-@pytest.mark.parametrize("state", ["RUNNING", "STOPPING"])
-def test_running_crawler_blocks_release(state):
-    ddb = DynamoDB()
-    result = sweep(ddb, glue=Glue(crawler_state=state))
-    assert result == {"action": "waiting_for_crawler", "owner": OWNER, "crawler_state": state}
-    assert ddb.deletes == []
+def test_janitor_never_inspects_a_crawler():
+    # Gold commits to Iceberg inside the Gold job; there is no crawler left to wait for.
+    assert not hasattr(Glue(), "get_crawler")
+    assert sweep(DynamoDB())["action"] == "released"
 
 
 def test_lock_owned_by_another_state_machine_is_never_touched():
@@ -143,7 +135,6 @@ def test_handler_uses_configuration_not_event(monkeypatch):
     monkeypatch.setenv("LOCK_TABLE", "lock")
     monkeypatch.setenv("STATE_MACHINE_ARN", SM_ARN)
     monkeypatch.setenv("GLUE_JOB_NAMES", ",".join(JOBS))
-    monkeypatch.setenv("CRAWLER_NAME", CRAWLER)
     # A forged event naming some other execution must not change which lock owner is checked.
     event = {"source": "aws.states", "detail": {"executionArn": "arn:forged", "status": "ABORTED"}}
     result = janitor.handler(event, None)

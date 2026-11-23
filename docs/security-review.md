@@ -2,22 +2,21 @@
 
 ## Deployed changes / Thay đổi đã apply
 
-Terraform now deploys separate `jobmarket-aws-silver-role`, `jobmarket-aws-gold-role` and
-`jobmarket-aws-crawler-role`. The shared `jobmarket-aws-glue-role` and AWSGlueServiceRole attachment
-were removed. No runtime role can write the deployed scripts; only Step Functions among pipeline
+Terraform now deploys separate `jobmarket-aws-silver-role` and `jobmarket-aws-gold-role`. The
+shared `jobmarket-aws-glue-role` and AWSGlueServiceRole attachment were removed, and since the
+Iceberg switch (November 2026) there is no crawler or crawler role. No runtime role can write the deployed scripts; only Step Functions among pipeline
 runtime roles can write the completion marker. Administrative identities remain outside that claim.
 
 | Role | Read | Write/delete/control |
 | --- | --- | --- |
 | Ingestion | Own script/config, ingestion manifests | Put Bronze/manifests, scoped Glue logs; no object delete |
 | Silver | Bronze, manifests, previous Silver, Silver pointer; its script/shared contract | Put/Delete Silver runs and quality output; Put Silver pointer; own temp prefix |
-| Gold | Silver runs, Silver pointer, manifests; its script/shared contract | Put/Delete only three Gold mart prefixes and their exact directory markers; own temp prefix. Shadow Iceberg (5.1): Put/Delete `gold_iceberg/*`, Put `state/gold_iceberg/*`, Get/Create/Update tables only in the `_iceberg` database |
-| Crawler | Gold objects and intended Gold Catalog metadata | Create/update tables/partitions in the Gold database; logs; no S3 write/delete |
-| Step Functions | Job/crawler status | Control three jobs/one crawler, Put/Delete only the pipeline lock key, Put completion marker |
+| Gold | Silver runs, Silver pointer, manifests; its script/shared contract | Put/Delete `gold_iceberg/*` (Iceberg data and metadata); Put `state/gold_iceberg/*` (version record); Get/Create/Update tables only in the `_iceberg` database; own temp prefix. No write to the legacy Parquet `gold/` |
+| Step Functions | Job status; the Gold version record | Control three jobs, Put/Delete only the pipeline lock key, Put completion marker |
 | Daily EventBridge | No lake data | Start this state machine only |
 | Health Lambda | Published metadata only | Its logs and JobMarket/Pipeline metrics only |
-| Lock janitor Lambda | Lock item; owner execution, three job runs and crawler status | Delete only the pipeline lock key (owner-conditional); its logs. No start/stop of executions or jobs |
-| Dashboard reader | Gold, metadata, pipeline lock, Gold Catalog | Athena SELECT workflow in its workgroup and result objects; no lake writes or Glue job execution |
+| Lock janitor Lambda | Lock item; owner execution and three job runs | Delete only the pipeline lock key (owner-conditional); its logs. No start/stop of executions or jobs |
+| Dashboard reader | Gold Iceberg files under `gold_iceberg/`, metadata, pipeline lock, `_iceberg` Catalog | Athena SELECT workflow in its workgroup and result objects; no lake writes or Glue job execution |
 
 Stage jobs retain bucket-level listing/metadata for their two buckets for Spark compatibility;
 object reads/writes remain prefix-scoped. Glue log permissions cover `/aws-glue/*` in this account
@@ -200,12 +199,11 @@ are useful existing boundaries. Lambda does not need SNS Publish: the alarm publ
 | --- | --- | --- | --- |
 | Ingestion | Its scripts/config; manifests | Put Bronze and manifests only | Prefix list, bucket location, scoped logs |
 | Silver job | Bronze, manifests, previous Silver and Silver pointer; job scripts | Silver run output and quality output (Put/Delete required by overwrite); Put Silver pointer; scoped temp | Scoped logs and metrics; only Glue/DQ calls actually required |
-| Gold job | Committed Silver, Silver pointer, manifests; job scripts | Three Gold mart prefixes and scoped temp (Put/Delete for partition overwrite) | Scoped logs and metrics; required Glue calls |
-| Crawler | Gold only | No S3 object write/delete | Read/update intended Catalog database/table/partition metadata; scoped logs |
-| Step Functions | Run/crawler status | Lock item and completion marker only | Control the three jobs and one crawler |
+| Gold job | Committed Silver, Silver pointer, manifests; job scripts | `gold_iceberg/*`, the Gold version record and scoped temp | Scoped logs and metrics; Iceberg table calls in its own database |
+| Step Functions | Run status; Gold version record | Lock item and completion marker only | Control the three jobs |
 | EventBridge | None | None | Start only this state machine |
 | Health monitor | Publication metadata only | Own logs/metrics only | Keep existing namespace restriction |
-| Lock janitor | Lock item; execution, job-run and crawler status | Delete the pipeline lock key only | DescribeExecution on this state machine's executions; GetJobRuns on three jobs; GetCrawler |
+| Lock janitor | Lock item; execution and job-run status | Delete the pipeline lock key only | DescribeExecution on this state machine's executions; GetJobRuns on three jobs |
 | Dashboard reader | Gold, publication metadata; lock GetItem | Athena query output prefix only, no lake/script mutations | Athena Start/Get/GetResults/Stop on designated workgroup; read Gold Catalog metadata |
 | Deployer | Infrastructure configuration and protected state | Upload code/config; reviewed infrastructure and IAM changes | PassRole limited to intended runtime roles/services; independent of dashboard |
 

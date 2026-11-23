@@ -140,3 +140,19 @@ def test_markdown_report_summarizes_runs():
     assert "8,099" in md and "43,540" in md
     assert "| Glue billed per run: jobs (Cost Explorer) | $0.0650 |" in md
     assert "| Glue billed per run: crawler (Cost Explorer) | $0.0495 |" in md
+
+
+def test_markdown_omits_crawler_rows_once_runs_have_no_crawler():
+    # After the Iceberg switch (Nov 2026) runs have no crawl stage and no crawler bill.
+    run = {"name": "x", "start": "2026-11-26T18:00:16Z", "total_seconds": 420.0,
+           "stages": {"Ingest": 110.0, "BronzeToSilver": 170.0, "SilverToGold": 125.0, "Crawl": None},
+           "glue_dpu_seconds": 500.0, "glue_cost_usd": 0.061}
+    report = {"generated_at": "2026-11-27T00:00:00+00:00", "region": "ap-southeast-1",
+              "price": {"usd_per_dpu_hour": 0.44, "usagetype": "APS1-ETL-DPU-Hour"}, "executions": [run],
+              "billed": {"2026-11-26": {"APS1-ETL-DPU-Hour": 0.06}},
+              "latest": {"snapshot_date": "2026-11-26", "bronze_rows": 1, "successful_boards": 36, "boards": 36,
+                         "silver_rows": 2, "gold_rows": 3, "dashboard_scan_bytes": 1048576}}
+    md = metrics.to_markdown(report)
+    assert "| Crawl |" not in md
+    assert "crawler" not in md
+    assert "| Glue billed per run: jobs (Cost Explorer) | $0.0600 |" in md

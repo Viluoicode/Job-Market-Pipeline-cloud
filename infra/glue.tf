@@ -1,15 +1,16 @@
 # ============================================================================================
-# Glue — Gold catalog database, two PySpark ETL jobs, and the Gold crawler.
+# Glue — Gold catalog databases (Iceberg + legacy Parquet) and two PySpark ETL jobs.
 # Jobs are on-demand only (no triggers/schedule) — you start them via Step Functions.
 # ============================================================================================
 
+# Legacy Parquet Gold (until 2026-11): kept so its historical tables stay queryable. Nothing
+# writes to it any more; the crawler that registered it was removed with the Iceberg switch.
 resource "aws_glue_catalog_database" "gold" {
   name = var.gold_database_name
 }
 
-# Shadow Iceberg copy of the Gold marts (task 5.1, phase A). Tables are created by the Gold job,
-# so their schema comes from code rather than a crawler. Kept outside gold/ so the Parquet crawler
-# never scans Iceberg data or metadata files.
+# Gold marts as Apache Iceberg tables. The Gold job creates and commits them, so their schema comes
+# from code; data and metadata live under gold_iceberg/.
 resource "aws_glue_catalog_database" "gold_iceberg" {
   name         = "${var.gold_database_name}_iceberg"
   location_uri = "s3://${aws_s3_bucket.lake.bucket}/gold_iceberg"
@@ -90,30 +91,4 @@ resource "aws_glue_job" "silver_to_gold" {
     "--iceberg_database" = aws_glue_catalog_database.gold_iceberg.name
   })
   depends_on = [aws_s3_object.silver_to_gold, aws_iam_role_policy.gold]
-}
-
-# Crawls s3://<lake>/gold/ and registers fact_job_posting + demand_by_role (one table per
-# top-level folder via TableLevelConfiguration = 3: <bucket>/gold/<table>/snapshot_date=.../).
-resource "aws_glue_crawler" "gold" {
-  #checkov:skip=CKV_AWS_195:buckets enforce SSE-S3 and TLS; a security configuration without KMS adds nothing
-  depends_on    = [aws_iam_role_policy.crawler]
-  name          = "${var.project}-gold-crawler"
-  role          = aws_iam_role.crawler.arn
-  database_name = aws_glue_catalog_database.gold.name
-
-  s3_target {
-    path = "s3://${aws_s3_bucket.lake.bucket}/gold/"
-  }
-
-  schema_change_policy {
-    delete_behavior = "LOG"
-    update_behavior = "UPDATE_IN_DATABASE"
-  }
-
-  configuration = jsonencode({
-    Version = 1.0
-    Grouping = {
-      TableLevelConfiguration = 3
-    }
-  })
 }

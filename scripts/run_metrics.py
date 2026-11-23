@@ -21,7 +21,8 @@ def stage_durations(events):
     """Seconds per pipeline stage from a Step Functions execution history.
 
     A stage spans its first *StateEntered to its last *StateExited event. The crawl spans
-    StartCrawler entered to BuildCompletion entered, i.e. start plus every poll until verified.
+    StartCrawler entered to BuildCompletion entered, i.e. start plus every poll until verified;
+    runs after the Iceberg switch (Nov 2026) have no crawler, so their Crawl is None.
     """
     first_entered, last_exited = {}, {}
     for event in events:
@@ -118,7 +119,9 @@ def to_markdown(report):
              "| Metric | Value |", "| --- | --- |",
              f"| End-to-end | {_duration(_median(r['total_seconds'] for r in runs))} |"]
     for stage in STAGES + ["Crawl"]:
-        lines.append(f"| {stage} | {_duration(_median(r['stages'][stage] for r in runs))} |")
+        median = _median(r["stages"].get(stage) for r in runs)
+        if median is not None:                       # no crawler row once runs have none
+            lines.append(f"| {stage} | {_duration(median)} |")
     lines += [
         f"| Glue job DPU-seconds | {_median(r['glue_dpu_seconds'] for r in runs):,.0f} |",
         f"| Glue job cost (estimate) | ${_median(r['glue_cost_usd'] for r in runs):.4f} |",
@@ -133,8 +136,9 @@ def to_markdown(report):
     if days:
         def billed(suffix):
             return _median(sum(v for k, v in d.items() if k.endswith(suffix)) for d in days)
-        lines += [f"| Glue billed per run: jobs (Cost Explorer) | ${billed('ETL-DPU-Hour'):.4f} |",
-                  f"| Glue billed per run: crawler (Cost Explorer) | ${billed('Crawler-DPU-Hour'):.4f} |"]
+        lines.append(f"| Glue billed per run: jobs (Cost Explorer) | ${billed('ETL-DPU-Hour'):.4f} |")
+        if billed("Crawler-DPU-Hour"):
+            lines.append(f"| Glue billed per run: crawler (Cost Explorer) | ${billed('Crawler-DPU-Hour'):.4f} |")
     return "\n".join(lines) + "\n"
 
 
@@ -174,7 +178,8 @@ def collect(session, *, executions, region, with_billed):
     silver = read_json(s3, lake, "state/silver/latest.json")
     manifest = read_json(s3, lake, f"control/ingestion/run_id={completion['run_id']}/manifest.json")
     records, query = query_fact(session, _terraform_output("gold_database"), _terraform_output("athena_workgroup"),
-                                completion["snapshot_date"])
+                                completion["snapshot_date"],
+                                completion["iceberg_snapshots"]["fact_job_posting"]["snapshot_id"])
     report = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "region": region,
         "method": "Step Functions history, Glue job runs, AWS Pricing API, published state, dashboard Athena query",

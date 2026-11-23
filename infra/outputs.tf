@@ -24,13 +24,18 @@ output "athena_workgroup" {
 }
 
 output "gold_database" {
-  description = "Glue Data Catalog database for the Gold marts."
-  value       = aws_glue_catalog_database.gold.name
+  description = "Glue Data Catalog database of the Gold marts (Apache Iceberg tables)."
+  value       = aws_glue_catalog_database.gold_iceberg.name
 }
 
 output "gold_iceberg_database" {
-  description = "Glue Data Catalog database for the shadow Iceberg Gold marts (task 5.1 phase A)."
+  description = "Same as gold_database; kept for scripts written during the Iceberg migration."
   value       = aws_glue_catalog_database.gold_iceberg.name
+}
+
+output "gold_parquet_database" {
+  description = "Legacy Parquet Gold database (read-only history before the Iceberg switch)."
+  value       = aws_glue_catalog_database.gold.name
 }
 
 output "bronze_to_silver_job" {
@@ -41,11 +46,6 @@ output "bronze_to_silver_job" {
 output "silver_to_gold_job" {
   description = "Glue job name (Silver -> Gold)."
   value       = aws_glue_job.silver_to_gold.name
-}
-
-output "gold_crawler" {
-  description = "Glue crawler name (Gold)."
-  value       = aws_glue_crawler.gold.name
 }
 
 output "schedule_rule" {
@@ -84,5 +84,5 @@ output "dashboard_reader_role_arn" {
   value       = try(aws_iam_role.dashboard_reader[0].arn, "")
 }
 output "stage_role_arns" {
-  value = { silver = aws_iam_role.silver.arn, gold = aws_iam_role.gold.arn, crawler = aws_iam_role.crawler.arn }
+  value = { silver = aws_iam_role.silver.arn, gold = aws_iam_role.gold.arn }
 }

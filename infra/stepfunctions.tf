@@ -1,4 +1,4 @@
-# One execution owns the pipeline lock through ingestion, transforms and the crawler.
+# One execution owns the pipeline lock through ingestion, transforms and Gold publication.
 locals {
   pipeline_stages = {
     Ingest = {
@@ -39,69 +39,40 @@ locals {
         }
       }
       ResultPath = null
-      Next       = "MarkCrawlerStart"
+      Next       = "ReadGoldVersions"
     }
-    MarkCrawlerStart = {
-      Type = "Pass"
+    # The Gold job writes this record only after all three Iceberg commits succeeded. Its snapshot
+    # ids go into the completion marker, so readers query exactly the versions this run committed.
+    ReadGoldVersions = {
+      Type     = "Task"
+      Resource = "arn:aws:states:::aws-sdk:s3:getObject"
       Parameters = {
-        # Glue crawl timestamps have second precision; avoid false failures on millisecond skew.
-        "started_at.$" = "States.Format('{}Z', States.ArrayGetItem(States.StringSplit($$.State.EnteredTime, '.Z'), 0))"
+        Bucket  = aws_s3_bucket.lake.bucket
+        "Key.$" = "States.Format('state/gold_iceberg/run_id={}.json', $.run.run_id)"
       }
-      ResultPath = "$.crawl"
-      Next       = "StartCrawler"
+      ResultSelector = { "record.$" = "States.StringToJson($.Body)" }
+      ResultPath     = "$.gold"
+      Next           = "GoldVersionsValid"
     }
-    StartCrawler = {
-      Type       = "Task"
-      Resource   = "arn:aws:states:::aws-sdk:glue:startCrawler"
-      Parameters = { Name = aws_glue_crawler.gold.name }
-      # An unrelated crawl must finish before OUR crawl is started.
-      Retry = [{
-        ErrorEquals     = ["Glue.CrawlerRunningException"]
-        IntervalSeconds = 30
-        BackoffRate     = 1.0
-        MaxAttempts     = 6
-      }]
-      ResultPath = null
-      Next       = "WaitForCrawler"
-    }
-    WaitForCrawler = {
-      Type    = "Wait"
-      Seconds = 30
-      Next    = "GetCrawler"
-    }
-    GetCrawler = {
-      Type       = "Task"
-      Resource   = "arn:aws:states:::aws-sdk:glue:getCrawler"
-      Parameters = { Name = aws_glue_crawler.gold.name }
-      ResultPath = "$.crawler"
-      Next       = "CrawlerFinished"
-    }
-    CrawlerFinished = {
-      Type = "Choice"
-      Choices = [{
-        Variable     = "$.crawler.Crawler.State"
-        StringEquals = "READY"
-        Next         = "CrawlerSucceeded"
-      }]
-      Default = "WaitForCrawler"
-    }
-    CrawlerSucceeded = {
+    GoldVersionsValid = {
       Type = "Choice"
       Choices = [{
         And = [
-          { Variable = "$.crawler.Crawler.LastCrawl.Status", IsPresent = true },
-          { Variable = "$.crawler.Crawler.LastCrawl.Status", StringEquals = "SUCCEEDED" },
-          { Variable = "$.crawler.Crawler.LastCrawl.StartTime", IsPresent = true },
-          { Variable = "$.crawler.Crawler.LastCrawl.StartTime", TimestampGreaterThanEqualsPath = "$.crawl.started_at" },
+          { Variable = "$.gold.record.run_id", StringEqualsPath = "$.run.run_id" },
+          { Variable = "$.gold.record.snapshot_date", StringEqualsPath = "$.run.snapshot_date" },
+          { Variable = "$.gold.record.status", StringEquals = "SUCCEEDED" },
+          { Variable = "$.gold.record.tables.fact_job_posting.snapshot_id", IsPresent = true },
+          { Variable = "$.gold.record.tables.demand_by_role.snapshot_id", IsPresent = true },
+          { Variable = "$.gold.record.tables.role_opportunity.snapshot_id", IsPresent = true },
         ]
         Next = "BuildCompletion"
       }]
-      Default = "CrawlerFailed"
+      Default = "GoldVersionsInvalid"
     }
-    CrawlerFailed = {
+    GoldVersionsInvalid = {
       Type  = "Fail"
-      Error = "CrawlerFailed"
-      Cause = "Crawler READY is insufficient: this execution's crawl must have succeeded."
+      Error = "GoldVersionsInvalid"
+      Cause = "The Gold version record is missing, belongs to another run, or lacks a table."
     }
     BuildCompletion = {
       Type = "Pass"
@@ -110,6 +81,8 @@ locals {
         "snapshot_date.$" = "$.run.snapshot_date"
         "started_at.$"    = "$.run.started_at"
         "completed_at.$"  = "$$.State.EnteredTime"
+        # Iceberg version (snapshot id, as text) and row count of each Gold table for this run.
+        "iceberg_snapshots.$" = "$.gold.record.tables"
       }
       ResultPath = "$.completion"
       Next       = "PublishCompletion"
@@ -137,7 +110,7 @@ resource "aws_sfn_state_machine" "pipeline" {
   role_arn = aws_iam_role.sfn.arn
   type     = "STANDARD"
   definition = jsonencode({
-    Comment        = "Ingest current boards, reconcile lifecycle, publish fresh Gold and verify crawler"
+    Comment        = "Ingest current boards, reconcile lifecycle, commit Gold to Iceberg and publish its versions"
     StartAt        = "InitializeRun"
     TimeoutSeconds = 5400
     States = {

@@ -1,6 +1,5 @@
-# Stage-specific runtime roles: one least-privilege role per workload (Silver, Gold, crawler,
-# dashboard reader). Converted from iam_runtime.tf.json; Sids, actions, resources, conditions
-# and statement order are unchanged, so `terraform plan` shows no IAM create/destroy.
+# Stage-specific runtime roles: one least-privilege role per workload (Silver, Gold, dashboard
+# reader). The Gold crawler and its role were removed when Gold moved to Iceberg (2026-11).
 
 # --------------------------------------------------------------------------------------------
 # Silver job (bronze -> silver): reads Bronze + its manifest + previous Silver, writes a new
@@ -144,12 +143,7 @@ data "aws_iam_policy_document" "gold" {
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts",
     ]
-    resources = [
-      "${aws_s3_bucket.lake.arn}/gold/fact_job_posting/*",
-      "${aws_s3_bucket.lake.arn}/gold/demand_by_role/*",
-      "${aws_s3_bucket.lake.arn}/gold/role_opportunity/*",
-      "${aws_s3_bucket.scripts.arn}/tmp/gold/*",
-    ]
+    resources = ["${aws_s3_bucket.scripts.arn}/tmp/gold/*"]
   }
   statement {
     sid = "BucketMetadata"
@@ -195,7 +189,7 @@ data "aws_iam_policy_document" "gold" {
     resources = ["arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:job/${var.project}-silver-to-gold"]
   }
   statement {
-    sid = "WriteIcebergShadow"
+    sid = "WriteIcebergGold"
     actions = [
       "s3:GetObject",
       "s3:PutObject",
@@ -206,7 +200,7 @@ data "aws_iam_policy_document" "gold" {
     resources = ["${aws_s3_bucket.lake.arn}/gold_iceberg/*"]
   }
   statement {
-    sid       = "RecordIcebergShadowOutcome"
+    sid       = "RecordGoldVersions"
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.lake.arn}/state/gold_iceberg/*"]
   }
@@ -225,19 +219,6 @@ data "aws_iam_policy_document" "gold" {
       "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.gold_database_name}_iceberg/*",
     ]
   }
-  statement {
-    sid = "GoldDirectoryMarkers"
-    actions = [
-      "s3:GetObject",
-      "s3:PutObject",
-      "s3:DeleteObject",
-    ]
-    resources = [
-      "${aws_s3_bucket.lake.arn}/gold/fact_job_posting_$folder$",
-      "${aws_s3_bucket.lake.arn}/gold/demand_by_role_$folder$",
-      "${aws_s3_bucket.lake.arn}/gold/role_opportunity_$folder$",
-    ]
-  }
 }
 
 resource "aws_iam_role_policy" "gold" {
@@ -247,80 +228,7 @@ resource "aws_iam_role_policy" "gold" {
 }
 
 # --------------------------------------------------------------------------------------------
-# Gold crawler: reads gold/ only and maintains the Gold tables in the Glue Data Catalog.
-# --------------------------------------------------------------------------------------------
-resource "aws_iam_role" "crawler" {
-  name               = "${var.project}-crawler-role"
-  assume_role_policy = data.aws_iam_policy_document.glue_assume.json
-}
-
-data "aws_iam_policy_document" "crawler" {
-  statement {
-    sid       = "ReadGold"
-    actions   = ["s3:GetObject"]
-    resources = ["${aws_s3_bucket.lake.arn}/gold/*"]
-  }
-  statement {
-    sid       = "ListGold"
-    actions   = ["s3:ListBucket"]
-    resources = [aws_s3_bucket.lake.arn]
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values = [
-        "gold",
-        "gold/",
-        "gold/*",
-      ]
-    }
-  }
-  statement {
-    sid       = "BucketLocation"
-    actions   = ["s3:GetBucketLocation"]
-    resources = [aws_s3_bucket.lake.arn]
-  }
-  statement {
-    sid = "GoldCatalog"
-    actions = [
-      "glue:GetDatabase",
-      "glue:GetTable",
-      "glue:GetTables",
-      "glue:GetPartition",
-      "glue:GetPartitions",
-      "glue:BatchGetPartition",
-      "glue:CreateTable",
-      "glue:UpdateTable",
-      "glue:CreatePartition",
-      "glue:BatchCreatePartition",
-      "glue:UpdatePartition",
-      "glue:BatchUpdatePartition",
-    ]
-    resources = [
-      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:catalog",
-      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:database/${var.gold_database_name}",
-      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.gold_database_name}/*",
-    ]
-  }
-  statement {
-    sid = "CrawlerLogs"
-    actions = [
-      "logs:CreateLogGroup",
-      "logs:CreateLogStream",
-      "logs:PutLogEvents",
-    ]
-    resources = ["arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws-glue/*"]
-  }
-}
-
-resource "aws_iam_role_policy" "crawler" {
-  name   = "${var.project}-crawler"
-  role   = aws_iam_role.crawler.id
-  policy = data.aws_iam_policy_document.crawler.json
-}
-
-# --------------------------------------------------------------------------------------------
-# Local Streamlit dashboard (assumed role): read-only on published Gold, publication metadata
-# and the writer lock; Athena query results are its only write.
+# Dashboard reader: assumed by the local dashboard; reads published Gold and metadata only.
 # --------------------------------------------------------------------------------------------
 resource "aws_iam_role" "dashboard_reader" {
   count = length(var.dashboard_reader_principal_arns) > 0 ? 1 : 0
@@ -341,7 +249,7 @@ data "aws_iam_policy_document" "dashboard_reader" {
     sid     = "ReadPublishedData"
     actions = ["s3:GetObject"]
     resources = [
-      "${aws_s3_bucket.lake.arn}/gold/*",
+      "${aws_s3_bucket.lake.arn}/gold_iceberg/*",
       "${aws_s3_bucket.lake.arn}/state/pipeline/latest.json",
       "${aws_s3_bucket.lake.arn}/state/silver/latest.json",
       "${aws_s3_bucket.lake.arn}/control/ingestion/*/manifest.json",
@@ -355,8 +263,8 @@ data "aws_iam_policy_document" "dashboard_reader" {
       test     = "StringLike"
       variable = "s3:prefix"
       values = [
-        "gold",
-        "gold/*",
+        "gold_iceberg",
+        "gold_iceberg/*",
         "state/*",
         "control/ingestion/*",
       ]
@@ -410,8 +318,8 @@ data "aws_iam_policy_document" "dashboard_reader" {
     ]
     resources = [
       "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:catalog",
-      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:database/${var.gold_database_name}",
-      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:table/${var.gold_database_name}/*",
+      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:database/${aws_glue_catalog_database.gold_iceberg.name}",
+      "arn:aws:glue:${var.region}:${data.aws_caller_identity.current.account_id}:table/${aws_glue_catalog_database.gold_iceberg.name}/*",
     ]
   }
   statement {

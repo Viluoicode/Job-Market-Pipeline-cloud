@@ -76,7 +76,7 @@ def compare(session, snapshot_date=None):
 
     s3, glue, athena = session.client("s3"), session.client("glue"), session.client("athena")
     lake, workgroup = _terraform_output("lake_bucket"), _terraform_output("athena_workgroup")
-    parquet_db, iceberg_db = _terraform_output("gold_database"), _terraform_output("gold_iceberg_database")
+    parquet_db, iceberg_db = _terraform_output("gold_parquet_database"), _terraform_output("gold_iceberg_database")
     completion = read_json(s3, lake, "state/pipeline/latest.json")
     snapshot_date = snapshot_date or completion["snapshot_date"]
     shadow = read_json(s3, lake, f"state/gold_iceberg/run_id={completion['run_id']}.json", optional=True)
