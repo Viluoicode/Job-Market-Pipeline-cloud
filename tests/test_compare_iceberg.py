@@ -16,7 +16,10 @@ COLUMNS = [("job_id", "string"), ("is_remote", "boolean"), ("last_seen_at", "tim
 def test_except_sql_normalizes_types_and_filters_one_day_on_both_sides():
     sql = compare.except_sql(COLUMNS, "pq_db.fact_job_posting", "ice_db.fact_job_posting", "2026-11-21")
     # Parquet partitions are strings, Iceberg's is a DATE; timestamps differ in time-zone type.
-    assert "CAST(job_id AS varchar)" in sql and "to_unixtime(last_seen_at)" in sql
+    assert "CAST(job_id AS varchar)" in sql
+    # Athena reads Hive/Parquet timestamps at millisecond precision, Iceberg keeps microseconds:
+    # compare whole milliseconds, the precision both sides share.
+    assert "floor(to_unixtime(last_seen_at) * 1000)" in sql
     assert "snapshot_date" not in sql.split("WHERE")[0]          # the partition column is not compared
     assert "FROM pq_db.fact_job_posting WHERE snapshot_date = '2026-11-21'" in sql
     assert "FROM ice_db.fact_job_posting WHERE snapshot_date = DATE '2026-11-21'" in sql

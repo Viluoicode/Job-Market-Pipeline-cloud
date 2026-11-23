@@ -29,9 +29,10 @@ def _checked(table, snapshot_date):
 
 
 def _normalized(name, glue_type):
-    # Parquet timestamps are `timestamp`, Iceberg's are `timestamp with time zone`: compare instants.
+    # Compare instants in whole milliseconds: Athena reads the Hive/Parquet tables' timestamps at
+    # millisecond precision, while Iceberg keeps Spark's microseconds (first run, 23 Nov 2026).
     if "timestamp" in glue_type:
-        return f"to_unixtime({name})"
+        return f"floor(to_unixtime({name}) * 1000)"
     return f"CAST({name} AS varchar)"
 
 
