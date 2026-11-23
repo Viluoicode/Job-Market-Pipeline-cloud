@@ -5,6 +5,7 @@ observed at a specific time; they are not a live status page.
 
 | File | Purpose |
 | --- | --- |
+| `iceberg-parity-<date>.json` | Shadow Iceberg Gold vs published Parquet Gold for one snapshot: row counts of all marts, row-level fact differences, verdict (task 5.1 phase A) |
 | `run-metrics-20261121.json` | Baseline before parallel fetch/Iceberg: stage timing, Glue DPU/cost (Pricing API + Cost Explorer), row counts, dashboard scan for 7 scheduled runs |
 | `handoff-check-20261001.json` | Next EventBridge execution after hardening, fresh reader query, dashboard filters and alarm status |
 | `security-acceptance-20260930.json` | Manual initial run, failed overwrite attempt and recovery; DQ, reader queries and validation |
