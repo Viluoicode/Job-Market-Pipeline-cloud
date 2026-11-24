@@ -65,6 +65,15 @@ ICEBERG_SCRIPT = textwrap.dedent("""
     from pyspark.sql import SparkSession, functions as F
     import silver_to_gold as s2g
 
+    if sys.argv[3] == "spark33":
+        # Glue 4.0 runs PySpark 3.3, whose DataFrameWriterV2.overwrite hands the Python Column to
+        # py4j unconverted ("Column is not iterable"); 3.4+ converts it. Verbatim from v3.3.0.
+        from pyspark.sql.readwriter import DataFrameWriterV2
+
+        def overwrite_33(self, condition):
+            self._jwriter.overwrite(condition)
+        DataFrameWriterV2.overwrite = overwrite_33
+
     spark = (SparkSession.builder.master("local[1]")
              .config("spark.driver.extraClassPath", sys.argv[1])   # classpath, not spark.jars: no Hadoop copy
              .config("spark.sql.extensions", "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
@@ -103,9 +112,10 @@ ICEBERG_SCRIPT = textwrap.dedent("""
 
 
 @pytest.mark.skipif(not ICEBERG_JAR, reason="set ICEBERG_SPARK_JAR to an iceberg-spark-runtime-3.5_2.12 jar")
-def test_write_iceberg_creates_replaces_one_day_atomically_and_time_travels(tmp_path):
+@pytest.mark.parametrize("pyspark_api", ["current", "spark33"])
+def test_write_iceberg_creates_replaces_one_day_atomically_and_time_travels(tmp_path, pyspark_api):
     script = tmp_path / "iceberg_check.py"
     script.write_text(ICEBERG_SCRIPT, encoding="utf-8")
-    result = subprocess.run([sys.executable, str(script), ICEBERG_JAR, str(JOBS_DIR)],
+    result = subprocess.run([sys.executable, str(script), ICEBERG_JAR, str(JOBS_DIR), pyspark_api],
                             capture_output=True, text=True, timeout=600)
     assert "ICEBERG_OK" in result.stdout, result.stdout[-3000:] + result.stderr[-5000:]

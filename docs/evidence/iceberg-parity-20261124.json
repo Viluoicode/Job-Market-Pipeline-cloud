@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-11-24T09:12:31+00:00",
+  "snapshot_date": "2026-11-23",
+  "run_id": "3a9f007f-8516-37bf-dc7c-7fb043fe4bf2_be3843e5-0e73-7f3a-ad7c-9baf8f9006b9",
+  "shadow_write": {
+    "run_id": "3a9f007f-8516-37bf-dc7c-7fb043fe4bf2_be3843e5-0e73-7f3a-ad7c-9baf8f9006b9",
+    "snapshot_date": "2026-11-23",
+    "mode": "shadow",
+    "status": "FAILED",
+    "tables": {},
+    "failed_table": "fact_job_posting",
+    "error_type": "TypeError",
+    "error": "Column is not iterable"
+  },
+  "row_counts": {
+    "fact_job_posting": {
+      "parquet": 8630,
+      "iceberg": 0
+    },
+    "demand_by_role": {
+      "parquet": 15,
+      "iceberg": 0
+    },
+    "role_opportunity": {
+      "parquet": 15,
+      "iceberg": 0
+    }
+  },
+  "fact_row_differences": {
+    "parquet_only": 8630,
+    "iceberg_only": 0
+  },
+  "fact_iceberg_snapshots": 1,
+  "verdict": "MISMATCH"
+}
