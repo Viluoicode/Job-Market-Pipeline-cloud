@@ -60,8 +60,8 @@ For a dedicated dashboard reader, scope permissions to the specific resources:
 | Service | Required capability |
 | --- | --- |
 | Athena | Start/Get/Stop query execution and GetQueryResults on the configured workgroup |
-| Glue Catalog | Read database/table/partition metadata for the Gold database |
-| Lake S3 | Read `gold/`, `state/`, `control/ingestion/`; required bucket listing/location |
+| Glue Catalog | Read database/table metadata for the Gold Iceberg database |
+| Lake S3 | Read `gold_iceberg/`, `state/`, `control/ingestion/`; required bucket listing/location |
 | Result S3 | Read/write Athena result objects and required bucket metadata; never lake write access |
 | DynamoDB | Consistent GetItem on the one pipeline-lock table |
 

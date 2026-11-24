@@ -164,7 +164,8 @@ resources and the separate runtime roles, not an unimplemented target design.
 - [x] Four PNG screenshots exist under `docs/screenshots/` (retaken 22 Nov 2026, snapshot 21 Nov UTC).
 - [x] AWS-icon diagram added: `docs/diagrams/architecture.drawio` and `architecture.png`, embedded in
   README and `docs/architecture.md` (22 Nov 2026).
-- [ ] Personally verify the diagram against the deployment as described above.
+- [x] Diagram redrawn by hand and checked against the deployment; Gold shown as Iceberg tables
+  that the Gold job registers in the Data Catalog, no crawler (24 Nov 2026).
 - [x] Screenshots reviewed at readable size with the UTC snapshot visible; overview and postings
   are embedded in README.
 - [ ] Embed filtered/verification in the lab/report.

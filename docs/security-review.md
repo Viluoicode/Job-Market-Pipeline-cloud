@@ -104,7 +104,7 @@ defaults whose cost or operating burden is not justified at this scale)
 | CKV_AWS_18 S3 access logging | buckets | Needs a separate log bucket; CloudTrail already records management events. |
 | CKV2_AWS_62 S3 event notifications | buckets | Nothing consumes object events; Step Functions orchestrates the pipeline. |
 | CKV_AWS_21 versioning | Athena results bucket | Query output is reproducible and expires after 7 days; versioning would keep it. Lake and scripts buckets are versioned. |
-| CKV_AWS_195 Glue security configuration | three jobs, crawler | Buckets already enforce SSE-S3 and TLS; a configuration without KMS adds no protection. |
+| CKV_AWS_195 Glue security configuration | three jobs | Buckets already enforce SSE-S3 and TLS; a configuration without KMS adds no protection. |
 | CKV_AWS_28 point-in-time recovery | lock table | It holds one transient lock item; restoring an old lock would be wrong. |
 | CKV_AWS_115 reserved concurrency | both Lambdas | Small accounts cannot reserve concurrency; overlapping runs are safe (conditional delete / idempotent metrics). |
 | CKV_AWS_116 dead-letter queue | both Lambdas | Scheduled asynchronous invocations; a failure raises an alarm and the next 15-minute run retries. |
@@ -233,7 +233,7 @@ Use diagrams.net: More Shapes → Networking → AWS library → Apply. Save the
 export SVG/PNG. Put the AWS workload in a region boundary; keep local Streamlit and public APIs
 outside. Do not invent VPC/private subnet/NAT resources absent from this deployment. Distinguish
 orchestration arrows from data reads/writes. Show Bronze/Silver/Gold as prefixes of one lake bucket,
-with scripts and Athena results as separate buckets. For the final drawing, show the deployed separate Silver, Gold and crawler roles and the
+with scripts and Athena results as separate buckets. For the final drawing, show the deployed separate Silver and Gold roles and the
 local dashboard assuming its reader role. The shared role above describes the pre-hardening state.
 
 References:

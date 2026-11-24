@@ -106,7 +106,7 @@ Streamlit · pytest · ruff · Checkov · GitHub Actions
 
 ```text
 ingestion/    Public API connectors, source catalog and run manifest
-glue/jobs/    Silver lifecycle, data quality and Gold transformations (Parquet + Iceberg)
+glue/jobs/    Silver lifecycle (Parquet), data quality and Gold marts (Apache Iceberg)
 infra/        Terraform: storage, jobs, orchestration, IAM, monitoring, cost controls
 monitoring/   Health monitor and lock janitor Lambdas
 dashboard/    Athena reader, publication checks and Streamlit page

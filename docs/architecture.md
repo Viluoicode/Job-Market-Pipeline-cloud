@@ -112,7 +112,9 @@ control/ingestion/run_id=<run>/manifest.json
 silver/runs/<run>/jobs/*.parquet
 quality/silver_jobs/<run>/
 state/silver/latest.json
-gold/<mart>/snapshot_date=<utc-date>/*.parquet
+gold_iceberg/<mart>/data/snapshot_date=<utc-date>/*.parquet
+gold_iceberg/<mart>/metadata/
+state/gold_iceberg/run_id=<run>.json
 state/pipeline/latest.json
 ```
 
