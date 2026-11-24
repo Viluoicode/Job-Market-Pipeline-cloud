@@ -235,7 +235,10 @@ def write_iceberg(df: DataFrame, table: str, snapshot_date: str):
     if name not in existing:
         df.writeTo(table).using("iceberg").partitionedBy(F.col("snapshot_date")).create()
     else:
-        df.writeTo(table).overwrite(F.col("snapshot_date") == F.lit(snapshot_date).cast("date"))
+        condition = F.col("snapshot_date") == F.lit(snapshot_date).cast("date")
+        # Call the JVM writer with the JVM column. PySpark 3.3 (Glue 4.0) passes the Python
+        # Column to py4j unconverted and fails with "Column is not iterable"; 3.4+ converts it.
+        df.writeTo(table)._jwriter.overwrite(condition._jc)
     latest = spark.sql(f"SELECT snapshot_id FROM {table}.snapshots ORDER BY committed_at DESC LIMIT 1").first()
     return latest["snapshot_id"] if latest else None
 
