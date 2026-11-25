@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-11-25T15:25:00+00:00",
+  "what": "First snapshot expiry on AWS (Glue 4.0, Iceberg 1.0) after deploying PR #25",
+  "execution": {
+    "name": "1d82b466-ef3a-4610-9dc9-09cebcda73d1",
+    "status": "SUCCEEDED",
+    "started": "2026-11-25T15:12:30Z",
+    "stopped": "2026-11-25T15:20:39Z"
+  },
+  "maintenance_record": {
+    "run_id": "1d82b466-ef3a-4610-9dc9-09cebcda73d1",
+    "retention_days": 30,
+    "status": "SUCCEEDED",
+    "tables": {
+      "fact_job_posting": {
+        "older_than": "2026-10-26T15:19:23.789531+00:00",
+        "pinned_snapshot_id": "6382534110638601022",
+        "deleted_data_files_count": 0,
+        "deleted_position_delete_files_count": 0,
+        "deleted_equality_delete_files_count": 0,
+        "deleted_manifest_files_count": 0,
+        "deleted_manifest_lists_count": 0
+      },
+      "demand_by_role": {
+        "older_than": "2026-10-26T15:19:23.789531+00:00",
+        "pinned_snapshot_id": "8969653081715000221",
+        "deleted_data_files_count": 0,
+        "deleted_position_delete_files_count": 0,
+        "deleted_equality_delete_files_count": 0,
+        "deleted_manifest_files_count": 0,
+        "deleted_manifest_lists_count": 0
+      },
+      "role_opportunity": {
+        "older_than": "2026-10-26T15:19:23.789531+00:00",
+        "pinned_snapshot_id": "7514236839978411926",
+        "deleted_data_files_count": 0,
+        "deleted_position_delete_files_count": 0,
+        "deleted_equality_delete_files_count": 0,
+        "deleted_manifest_files_count": 0,
+        "deleted_manifest_lists_count": 0
+      }
+    }
+  },
+  "table_properties_after": {
+    "fact_job_posting": {
+      "write.metadata.previous-versions-max": "30",
+      "write.metadata.delete-after-commit.enabled": "true",
+      "snapshots": 5
+    },
+    "demand_by_role": {
+      "write.metadata.previous-versions-max": "30",
+      "write.metadata.delete-after-commit.enabled": "true",
+      "snapshots": 5
+    },
+    "role_opportunity": {
+      "write.metadata.previous-versions-max": "30",
+      "write.metadata.delete-after-commit.enabled": "true",
+      "snapshots": 5
+    }
+  },
+  "note": "Nothing deleted yet: no snapshot is older than the 30-day window. The cutoff never passes the pinned snapshot ids."
+}
