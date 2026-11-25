@@ -1,0 +1,600 @@
+{
+  "checked_at": "2026-11-25T06:22:57.897993+00:00",
+  "method": "IAM identity-policy simulation plus direct S3 configuration reads; not destructive probes or a complete account audit",
+  "passed": true,
+  "checks": [
+    {
+      "role": "ingestion",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "ingestion",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "ingestion",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "health-monitor",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "health-monitor",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "health-monitor",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts/jobs/silver_to_gold.py",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "ingestion",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/run_id=probe/source=x/board=y/jobs.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "ingestion",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/silver/runs/probe/jobs/x.parquet",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/silver/runs/probe/jobs/x.parquet",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "glue:UpdateJob",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:job/jobmarket-aws-silver-to-gold",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/silver/runs/probe/jobs/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:DeleteObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/silver/runs/probe/jobs/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "glue:UpdateJob",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:job/jobmarket-aws-silver-to-gold",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "silver",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/silver/latest.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold/fact_job_posting/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/gold_iceberg/run_id=probe.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "glue:UpdateTable",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket_aws_gold_iceberg/fact_job_posting",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "gold",
+      "action": "glue:UpdateTable",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket_aws_gold/fact_job_posting",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "s3:GetObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/gold_iceberg/run_id=probe.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "glue:StartCrawler",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:crawler/jobmarket-aws-gold-crawler",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:GetObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:GetObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/metadata/v1.metadata.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "glue:GetTable",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket_aws_gold_iceberg/fact_job_posting",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:GetObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/state/pipeline/latest.json",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:GetObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/bronze/x.json",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake/gold_iceberg/fact_job_posting/data/snapshot_date=2026-11-23/x.parquet",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "s3:PutObject",
+      "resource": "arn:aws:s3:::jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-athena/results/query.csv",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "glue:StartJobRun",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:job/jobmarket-aws-ingestion",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "athena:StartQueryExecution",
+      "resource": "arn:aws:athena:ap-southeast-1:REDACTED_ACCOUNT_ID:workgroup/jobmarket-aws",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "athena:StartQueryExecution",
+      "resource": "arn:aws:athena:ap-southeast-1:REDACTED_ACCOUNT_ID:workgroup/primary",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "states:DescribeExecution",
+      "resource": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:execution:jobmarket-aws-pipeline:probe",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "states:StartExecution",
+      "resource": "arn:aws:states:ap-southeast-1:REDACTED_ACCOUNT_ID:stateMachine:jobmarket-aws-pipeline",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "glue:GetJobRuns",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:job/jobmarket-aws-silver-to-gold",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "glue:BatchStopJobRun",
+      "resource": "arn:aws:glue:ap-southeast-1:REDACTED_ACCOUNT_ID:job/jobmarket-aws-silver-to-gold",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "dynamodb:PutItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "dynamodb:PutItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "sfn",
+      "action": "dynamodb:PutItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "dynamodb:GetItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "dashboard-reader",
+      "action": "dynamodb:GetItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "dynamodb:DeleteItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "allowed",
+      "decision": "allowed",
+      "missing_context": [],
+      "passed": true
+    },
+    {
+      "role": "lock-janitor",
+      "action": "dynamodb:DeleteItem",
+      "resource": "arn:aws:dynamodb:ap-southeast-1:REDACTED_ACCOUNT_ID:table/jobmarket-aws-pipeline-lock",
+      "expected": "denied",
+      "decision": "implicitDeny",
+      "missing_context": [],
+      "passed": true
+    }
+  ],
+  "buckets": [
+    {
+      "bucket": "jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-lake",
+      "https_deny": true,
+      "public_access_block": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      },
+      "ownership": [
+        {
+          "ObjectOwnership": "BucketOwnerEnforced"
+        }
+      ],
+      "versioning": "Enabled",
+      "passed": true
+    },
+    {
+      "bucket": "jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-scripts",
+      "https_deny": true,
+      "public_access_block": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      },
+      "ownership": [
+        {
+          "ObjectOwnership": "BucketOwnerEnforced"
+        }
+      ],
+      "versioning": "Enabled",
+      "passed": true
+    },
+    {
+      "bucket": "jobmarket-aws-REDACTED_ACCOUNT_ID-ap-southeast-1-athena",
+      "https_deny": true,
+      "public_access_block": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      },
+      "ownership": [
+        {
+          "ObjectOwnership": "BucketOwnerEnforced"
+        }
+      ],
+      "versioning": "Disabled",
+      "passed": true
+    }
+  ]
+}

@@ -20,9 +20,9 @@ the result through Athena to a read-only Streamlit dashboard.
 | --- | --- |
 | Reliability | 68 of 68 scheduled nightly runs succeeded, 15 Sep – 21 Nov 2026 (UTC) |
 | Latest snapshot | 8,672 open postings from 467 employers; 36 of 36 boards collected (21 Nov 2026) |
-| Run time | 9 minutes from trigger to published tables (median, 14–20 Nov) |
-| Cost | About $0.11 per run in AWS Glue before credits; orchestration and monitoring stay in the free tier |
-| Quality gates | 251 tests, ruff, Terraform validation and a Checkov scan on every pull request; 69/69 IAM permission simulations |
+| Run time | 7 minutes from trigger to published tables with Iceberg Gold (25 Nov); 9 minutes before (median, 14–20 Nov) |
+| Cost | About $0.06 per run in AWS Glue before credits, down from $0.11 once the crawler was removed; orchestration and monitoring stay in the free tier |
+| Quality gates | 260+ tests, ruff, Terraform validation and a Checkov scan on every pull request; 60/60 IAM permission simulations |
 
 ## Architecture
 
@@ -77,19 +77,25 @@ The dashboard reading the published snapshot of 21 November 2026 (UTC):
 
 ### Performance and cost
 
-Measured by `scripts/run_metrics.py` over the **7 scheduled runs of 14–20 November 2026**
-(medians; [evidence](docs/evidence/run-metrics-20261121.json)). Baseline before parallel fetching
-and Iceberg.
+Measured by `scripts/run_metrics.py`. **Before:** the 7 scheduled runs of 14–20 November 2026,
+medians, Parquet Gold with a crawler ([evidence](docs/evidence/run-metrics-20261121.json)).
+**After:** the first run with parallel fetching and Iceberg Gold, 25 November 2026
+([evidence](docs/evidence/run-metrics-20261125-iceberg.json)). One run is an early reading, not a
+median; Silver did not change, so its time is the control.
 
-| Metric | Value |
-| --- | --- |
-| End-to-end (EventBridge → published Gold) | 9m 00s |
-| Ingest / Bronze→Silver / Silver→Gold / crawl | 1m 59s / 2m 58s / 3m 00s / 1m 01s |
-| Glue DPU-seconds per run (3 jobs) | 517 |
-| Glue cost per run: jobs | $0.064 (estimate $0.0632 at $0.44/DPU-hour from the AWS Pricing API; Cost Explorer $0.0635) |
-| Glue cost per run: crawler | $0.049 (Cost Explorer; about 44% of Glue cost for a one-minute crawl) |
-| Rows: Bronze → Silver lifecycle → Gold | 8,099 → 43,540 → 8,505 published postings |
-| Dashboard query scan | 1.0 MiB |
+| Metric | Before | After |
+| --- | --- | --- |
+| End-to-end (trigger → published Gold) | 9m 00s | 6m 52s |
+| Ingest | 1m 59s | 0m 56s (five boards fetched at a time) |
+| Bronze→Silver | 2m 58s | 3m 04s (unchanged job) |
+| Silver→Gold | 3m 00s | 2m 50s (Iceberg commits plus version record) |
+| Crawl | 1m 01s | none: the Gold job registers its tables |
+| Glue DPU-seconds per run (jobs) | 517 | 485 |
+| Glue cost per run: jobs | $0.064 | $0.059 (estimate at $0.44/DPU-hour, AWS Pricing API) |
+| Glue cost per run: crawler | $0.049 (Cost Explorer) | $0 |
+| Glue cost per run: total | about $0.11 | about $0.06 |
+| Rows: Bronze → Silver lifecycle → Gold | 8,099 → 43,540 → 8,505 | 8,421 → 46,115 → 8,502 |
+| Dashboard query scan | 1.0 MiB | 0.6 MiB (one pinned Iceberg snapshot) |
 
 Costs are pre-credit list prices. Lambda, Step Functions, EventBridge and the six alarms stayed in
 the free tier; S3 and DynamoDB added cents per day. Gold can exceed one run's Bronze rows: postings

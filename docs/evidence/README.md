@@ -5,7 +5,9 @@ observed at a specific time; they are not a live status page.
 
 | File | Purpose |
 | --- | --- |
-| `iceberg-parity-<date>.json` | Shadow Iceberg Gold vs published Parquet Gold for one snapshot: row counts of all marts, row-level fact differences, verdict (task 5.1 phase A) |
+| `iceberg-parity-<date>.json` | Shadow Iceberg Gold vs published Parquet Gold for one snapshot: row counts of all marts, row-level fact differences, verdict (task 5.1 phase A). 22, 24 and 25 Nov match; 23 Nov records the Spark 3.3 overwrite failure fixed before the switch |
+| `run-metrics-20261125-iceberg.json` | First run after the Iceberg switch (phase B): stage timing, Glue DPU/cost, row counts, dashboard scan |
+| `security-permissions-20261125.json` | IAM allowed/denied simulations and S3 guardrails after the Iceberg switch and crawler removal (60/60) |
 | `run-metrics-20261121.json` | Baseline before parallel fetch/Iceberg: stage timing, Glue DPU/cost (Pricing API + Cost Explorer), row counts, dashboard scan for 7 scheduled runs |
 | `handoff-check-20261001.json` | Next EventBridge execution after hardening, fresh reader query, dashboard filters and alarm status |
 | `security-acceptance-20260930.json` | Manual initial run, failed overwrite attempt and recovery; DQ, reader queries and validation |
