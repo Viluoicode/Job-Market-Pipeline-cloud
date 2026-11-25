@@ -67,6 +67,9 @@ def verify(session, project, lake, scripts, results, database, workgroup):
     check("silver", "s3:PutObject", obj(lake, "state/silver/latest.json"), True)
     check("gold", "s3:PutObject", obj(lake, "gold/fact_job_posting/snapshot_date=2026-11-23/x.parquet"), False)
     check("gold", "s3:PutObject", obj(lake, "state/gold_iceberg/run_id=probe.json"), True)
+    # Snapshot expiry: Gold reads the pinned versions and records its outcome; it never publishes.
+    check("gold", "s3:GetObject", obj(lake, "state/pipeline/latest.json"), True)
+    check("gold", "s3:PutObject", obj(lake, "state/gold_iceberg/maintenance/run_id=probe.json"), True)
     check("gold", "glue:UpdateTable", arn("glue", f"table/{iceberg_db}/fact_job_posting"), True)
     check("gold", "glue:UpdateTable", arn("glue", f"table/{database}/fact_job_posting"), False)
     check("sfn", "s3:PutObject", obj(lake, "state/pipeline/latest.json"), True)

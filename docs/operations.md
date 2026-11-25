@@ -89,6 +89,18 @@ SELECT * FROM "jobmarket_aws_gold_iceberg"."fact_job_posting$snapshots" ORDER BY
 SELECT count(*) FROM jobmarket_aws_gold_iceberg.fact_job_posting FOR VERSION AS OF <snapshot_id>;
 ```
 
+**Snapshot expiry.** Every commit keeps the files it replaced, because older snapshots still
+reference them. After publishing, the Gold job expires snapshots older than
+`iceberg_snapshot_retention_days` (default 30) and Iceberg deletes the files only those snapshots
+used. It never expires past the snapshot the current completion marker pins, and it always keeps
+the newest one; a table whose pinned snapshot cannot be found is left untouched. New tables also
+keep only the 30 newest `metadata.json` files. The outcome per table (cutoff, deleted file counts or
+the error) is in `state/gold_iceberg/maintenance/run_id=<run>.json`. A failed expiry never fails
+the run; the next night retries. Time travel therefore reaches back about 30 days.
+
+Hết hạn snapshot: job Gold tự xóa snapshot cũ hơn 30 ngày sau mỗi lần công bố, không bao giờ xóa
+phiên bản mà marker đang ghim. Lỗi ở bước này không làm fail pipeline.
+
 `scripts/compare_iceberg.py` compared the legacy Parquet Gold with Iceberg during the migration;
 it applies only to dates that have both.
 

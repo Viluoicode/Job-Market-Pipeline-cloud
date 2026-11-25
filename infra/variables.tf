@@ -86,6 +86,16 @@ variable "glue_log_retention_days" {
   default     = 30
 }
 
+variable "iceberg_snapshot_retention_days" {
+  description = "The Gold job expires Iceberg snapshots older than N days, never the ones the completion marker pins."
+  type        = number
+  default     = 30
+  validation {
+    condition     = var.iceberg_snapshot_retention_days >= 1
+    error_message = "Keep at least one day of Iceberg snapshots."
+  }
+}
+
 variable "bronze_expiration_days" {
   description = "Expire raw bronze/ objects after N days."
   type        = number

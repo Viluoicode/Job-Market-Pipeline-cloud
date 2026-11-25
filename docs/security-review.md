@@ -11,7 +11,7 @@ runtime roles can write the completion marker. Administrative identities remain 
 | --- | --- | --- |
 | Ingestion | Own script/config, ingestion manifests | Put Bronze/manifests, scoped Glue logs; no object delete |
 | Silver | Bronze, manifests, previous Silver, Silver pointer; its script/shared contract | Put/Delete Silver runs and quality output; Put Silver pointer; own temp prefix |
-| Gold | Silver runs, Silver pointer, manifests; its script/shared contract | Put/Delete `gold_iceberg/*` (Iceberg data and metadata); Put `state/gold_iceberg/*` (version record); Get/Create/Update tables only in the `_iceberg` database; own temp prefix. No write to the legacy Parquet `gold/` |
+| Gold | Silver runs, Silver pointer, manifests, the completion marker (pinned versions for snapshot expiry); its script/shared contract | Put/Delete `gold_iceberg/*` (Iceberg data and metadata); Put `state/gold_iceberg/*` (version record); Get/Create/Update tables only in the `_iceberg` database; own temp prefix. No write to the legacy Parquet `gold/` |
 | Step Functions | Job status; the Gold version record | Control three jobs, Put/Delete only the pipeline lock key, Put completion marker |
 | Daily EventBridge | No lake data | Start this state machine only |
 | Health Lambda | Published metadata only | Its logs and JobMarket/Pipeline metrics only |

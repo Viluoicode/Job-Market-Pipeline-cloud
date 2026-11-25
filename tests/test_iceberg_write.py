@@ -9,6 +9,7 @@ import os
 import subprocess
 import sys
 import textwrap
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -59,6 +60,74 @@ def test_publish_requires_a_committed_snapshot():
                             snapshot_date="2026-11-21", writer=lambda df, table, day: None)
 
 
+# ---- snapshot expiry --------------------------------------------------------------------------
+NOW = datetime(2026, 11, 26, 18, 10, tzinfo=timezone.utc)
+
+
+def test_expiry_cutoff_keeps_the_retention_window():
+    assert s2g.snapshot_expiry_cutoff(NOW, 30) == NOW - timedelta(days=30)
+
+
+def test_expiry_cutoff_never_passes_the_snapshot_readers_are_pinned_to():
+    pinned_at = NOW - timedelta(days=45)          # publication stalled: readers still use an old version
+    assert s2g.snapshot_expiry_cutoff(NOW, 30, pinned_at) == pinned_at
+    recent = NOW - timedelta(days=1)              # a recent pin does not shorten the window
+    assert s2g.snapshot_expiry_cutoff(NOW, 30, recent) == NOW - timedelta(days=30)
+
+
+def test_maintenance_expires_each_table_up_to_its_pinned_snapshot():
+    pinned_at = {"111": NOW - timedelta(days=40), "222": NOW - timedelta(days=1)}
+    calls = []
+
+    def expire(spark, table, older_than):
+        calls.append((table, older_than))
+        return {"deleted_data_files_count": 4, "deleted_manifest_files_count": 2}
+
+    record = s2g.maintain_iceberg(
+        None, ["c.db.fact_job_posting", "c.db.demand_by_role"], run_id="run-9", now=NOW, retention_days=30,
+        pinned={"fact_job_posting": "111", "demand_by_role": "222"},
+        expire=expire, committed_at=lambda spark, table, snapshot_id: pinned_at[snapshot_id])
+    assert calls == [("c.db.fact_job_posting", NOW - timedelta(days=40)),
+                     ("c.db.demand_by_role", NOW - timedelta(days=30))]
+    assert record["status"] == "SUCCEEDED" and record["run_id"] == "run-9" and record["retention_days"] == 30
+    assert record["tables"]["fact_job_posting"] == {
+        "older_than": "2026-10-17T18:10:00+00:00", "pinned_snapshot_id": "111",
+        "deleted_data_files_count": 4, "deleted_manifest_files_count": 2}
+
+
+def test_maintenance_does_not_expire_a_table_whose_pinned_snapshot_is_unknown():
+    # If the pin cannot be dated, expiring by age alone could delete what the dashboard reads.
+    calls = []
+    record = s2g.maintain_iceberg(
+        None, ["c.db.fact_job_posting"], run_id="run-9", now=NOW, retention_days=30,
+        pinned={"fact_job_posting": "111"}, expire=lambda *a: calls.append(a),
+        committed_at=lambda spark, table, snapshot_id: None)
+    assert calls == []
+    assert record["status"] == "FAILED"
+    assert "111" in record["tables"]["fact_job_posting"]["error"]
+
+
+def test_maintenance_failure_is_recorded_and_the_other_tables_still_run():
+    def expire(spark, table, older_than):
+        if table.endswith("fact_job_posting"):
+            raise RuntimeError("AccessDenied: s3:DeleteObject")
+        return {"deleted_data_files_count": 0}
+
+    record = s2g.maintain_iceberg(
+        None, ["c.db.fact_job_posting", "c.db.demand_by_role"], run_id="run-9", now=NOW, retention_days=30,
+        pinned={}, expire=expire, committed_at=lambda *a: None)
+    assert record["status"] == "FAILED"
+    assert record["tables"]["fact_job_posting"]["error_type"] == "RuntimeError"
+    assert record["tables"]["demand_by_role"]["deleted_data_files_count"] == 0
+
+
+def test_pinned_snapshots_come_from_the_completion_marker():
+    marker = {"iceberg_snapshots": {"fact_job_posting": {"snapshot_id": "111", "rows": 8}}}
+    assert s2g.pinned_snapshots(marker) == {"fact_job_posting": "111"}
+    assert s2g.pinned_snapshots(None) == {}                                   # first ever run
+    assert s2g.pinned_snapshots({"run_id": "r", "snapshot_date": "d"}) == {}  # marker from before Iceberg
+
+
 ICEBERG_SCRIPT = textwrap.dedent("""
     import sys
     sys.path.insert(0, sys.argv[2])
@@ -107,6 +176,48 @@ ICEBERG_SCRIPT = textwrap.dedent("""
     spec = spark.sql(f"SELECT * FROM {t}.partitions").columns
     assert "partition" in spec
     assert [str(r.partition.snapshot_date) for r in spark.table(f"{t}.partitions").collect()] == ["2026-11-20"]
+
+    # New tables drop metadata files beyond the newest versions on each commit.
+    props = {r.key: r.value for r in spark.sql(f"SHOW TBLPROPERTIES {t}").collect()}
+    assert props.get("write.metadata.delete-after-commit.enabled") == "true", props
+    assert props.get("write.metadata.previous-versions-max") == "30", props
+
+    # Snapshot expiry. Readers are pinned to s3, so nothing from s3 on may go, whatever the window.
+    from datetime import datetime, timedelta, timezone
+    s5 = s2g.write_iceberg(day("2026-11-22", ["f"]), t, "2026-11-22")
+    now = datetime.now(timezone.utc) + timedelta(seconds=1)
+    rec = s2g.maintain_iceberg(spark, [t], run_id="r", now=now, retention_days=0,
+                               pinned={"fact_job_posting": str(s3)})
+    assert rec["status"] == "SUCCEEDED", rec
+    snaps = [r.snapshot_id for r in spark.sql(f"SELECT snapshot_id FROM {t}.snapshots ORDER BY committed_at").collect()]
+    assert snaps == [s3, s4, s5], (snaps, [s3, s4, s5])
+    # Only s2 used the file holding "c" (s3 replaced that day), so exactly one data file is deleted.
+    assert rec["tables"]["fact_job_posting"]["deleted_data_files_count"] == 1, rec
+    assert sorted(r.job_id for r in spark.read.option("snapshot-id", s3).table(t).collect()) == ["a", "b", "d", "e"]
+    try:
+        spark.read.option("snapshot-id", s2).table(t).collect()
+        raise AssertionError("expired snapshot s2 is still readable")
+    except Exception as exc:
+        assert "s2 is still readable" not in str(exc), exc
+
+    # Once readers move to the newest snapshot, everything older than the window goes.
+    rec = s2g.maintain_iceberg(spark, [t], run_id="r2", now=now, retention_days=0,
+                               pinned={"fact_job_posting": str(s5)})
+    snaps = [r.snapshot_id for r in spark.sql(f"SELECT snapshot_id FROM {t}.snapshots").collect()]
+    assert snaps == [s5], snaps
+    # s3 wrote "d" and "e" in one file; s4 (the empty rerun) wrote none. So one file goes.
+    assert rec["tables"]["fact_job_posting"]["deleted_data_files_count"] == 1, rec
+    assert rows() == [("a", "2026-11-20"), ("b", "2026-11-20"), ("f", "2026-11-22")], rows()
+
+    # A table created before these properties existed gets them on its next maintenance.
+    old = "test.gold.legacy"
+    day("2026-11-20", ["x"]).writeTo(old).using("iceberg").create()
+    s2g.ensure_table_properties(spark, old)
+    props = {r.key: r.value for r in spark.sql(f"SHOW TBLPROPERTIES {old}").collect()}
+    assert props.get("write.metadata.delete-after-commit.enabled") == "true", props
+    before = spark.sql(f"SELECT count(*) c FROM {old}.metadata_log_entries").first().c
+    s2g.ensure_table_properties(spark, old)                                          # idempotent: no new commit
+    assert spark.sql(f"SELECT count(*) c FROM {old}.metadata_log_entries").first().c == before
     print("ICEBERG_OK")
 """)
 
