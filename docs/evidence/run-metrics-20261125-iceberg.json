@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-11-25T06:23:24+00:00",
+  "region": "ap-southeast-1",
+  "method": "Step Functions history, Glue job runs, AWS Pricing API, published state, dashboard Athena query",
+  "price": {
+    "usd_per_dpu_hour": 0.44,
+    "usagetype": "APS1-ETL-DPU-Hour",
+    "description": "$0.44 per Data Processing Unit-Hour for AWS Glue ETL job"
+  },
+  "executions": [
+    {
+      "name": "b09b4969-2d3a-46f2-9f20-b065bdbeadeb",
+      "start": "2026-11-25T06:14:20.128000+00:00",
+      "total_seconds": 411.661,
+      "stages": {
+        "Ingest": 56.273,
+        "BronzeToSilver": 184.429,
+        "SilverToGold": 170.45,
+        "Crawl": null
+      },
+      "glue_job_runs": [
+        {
+          "job": "jobmarket-aws-ingestion",
+          "job_run_id": "jr_6d7d6321fba38cf04ba585f54107afb49509c0f94bf588dcdb8c037a6b962305",
+          "state": "SUCCEEDED",
+          "execution_seconds": 29,
+          "dpu_seconds": 1.8125
+        },
+        {
+          "job": "jobmarket-aws-bronze-to-silver",
+          "job_run_id": "jr_b01ce356b94b34c31087fd76e3a39041372c78c2c0d0be697760665f2cb09113",
+          "state": "SUCCEEDED",
+          "execution_seconds": 123,
+          "dpu_seconds": 247.0
+        },
+        {
+          "job": "jobmarket-aws-silver-to-gold",
+          "job_run_id": "jr_c29aee7d3024e05ebcea095b2fa02f57d571528b508a8d35282bb1272bb06b48",
+          "state": "SUCCEEDED",
+          "execution_seconds": 118,
+          "dpu_seconds": 236.0
+        }
+      ],
+      "glue_dpu_seconds": 484.8125,
+      "glue_cost_usd": 0.059255
+    }
+  ],
+  "latest": {
+    "snapshot_date": "2026-11-25",
+    "run_id": "b09b4969-2d3a-46f2-9f20-b065bdbeadeb",
+    "bronze_rows": 8421,
+    "successful_boards": 36,
+    "boards": 36,
+    "silver_rows": 46115,
+    "gold_rows": 8502,
+    "dashboard_scan_bytes": 649949,
+    "dashboard_query_id": "3cd1dcea-ee80-4b8c-a103-e3f2bdf6f147"
+  }
+}
