@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-11-25T05:56:31+00:00",
+  "snapshot_date": "2026-11-25",
+  "run_id": "e1a71091-f34c-486e-8e45-3e06b657420c",
+  "shadow_write": {
+    "run_id": "e1a71091-f34c-486e-8e45-3e06b657420c",
+    "snapshot_date": "2026-11-25",
+    "mode": "shadow",
+    "status": "SUCCEEDED",
+    "tables": {
+      "fact_job_posting": {
+        "snapshot_id": 5142162496398626222,
+        "rows": 8502
+      },
+      "demand_by_role": {
+        "snapshot_id": 2489924545098915447,
+        "rows": 15
+      },
+      "role_opportunity": {
+        "snapshot_id": 3411535939704866059,
+        "rows": 15
+      }
+    }
+  },
+  "row_counts": {
+    "fact_job_posting": {
+      "parquet": 8502,
+      "iceberg": 8502
+    },
+    "demand_by_role": {
+      "parquet": 15,
+      "iceberg": 15
+    },
+    "role_opportunity": {
+      "parquet": 15,
+      "iceberg": 15
+    }
+  },
+  "fact_row_differences": {
+    "parquet_only": 0,
+    "iceberg_only": 0
+  },
+  "fact_iceberg_snapshots": 3,
+  "verdict": "MATCH"
+}
