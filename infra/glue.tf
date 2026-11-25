@@ -89,6 +89,8 @@ resource "aws_glue_job" "silver_to_gold" {
     "--datalake-formats" = "iceberg"
     "--conf"             = local.iceberg_spark_conf
     "--iceberg_database" = aws_glue_catalog_database.gold_iceberg.name
+    # Snapshot expiry after each publish (see silver_to_gold.maintain_iceberg).
+    "--snapshot_retention_days" = tostring(var.iceberg_snapshot_retention_days)
   })
   depends_on = [aws_s3_object.silver_to_gold, aws_iam_role_policy.gold]
 }

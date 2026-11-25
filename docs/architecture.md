@@ -168,6 +168,11 @@ exceed 2^53). Step Functions checks that this record belongs to the run, then co
 consistent set even if a later run commits meanwhile. Consumers must still validate matching
 Silver and pipeline run IDs plus wall-clock freshness before treating a snapshot as current.
 
+Old snapshots are expired by the Gold job after each publish, under the same writer lock: those
+older than 30 days go, but never one at or after the snapshot the completion marker pins, so a
+reader's pinned version always exists. Without this, every overwritten day would keep its files
+forever.
+
 History: until November 2026 Gold was plain Parquet under `gold/`, registered by a crawler. Iceberg
 ran in shadow mode for several days, compared with Parquet by `scripts/compare_iceberg.py`
 ([evidence](evidence/README.md)), before readers switched and the crawler was removed. The Parquet

@@ -62,7 +62,8 @@ More: [architecture and invariants](docs/architecture.md) ·
 - **Atomic, pinned Gold with Apache Iceberg.** Each table replaces its day in one commit, and the
   completion marker pins the three snapshot ids, so readers query one consistent set with
   `FOR VERSION AS OF`. The migration ran in shadow mode first and was compared with the old
-  Parquet Gold row by row; it also removed the crawler, about 44% of Glue cost per run.
+  Parquet Gold row by row; it also removed the crawler, about 44% of Glue cost per run. Snapshots
+  older than 30 days are expired nightly, never the version readers are pinned to.
 - **Least privilege, checked in CI.** Each stage runs under its own IAM role and the dashboard
   assumes a read-only role. Checkov runs on every pull request with zero open findings; each
   accepted one carries a written reason next to the resource.

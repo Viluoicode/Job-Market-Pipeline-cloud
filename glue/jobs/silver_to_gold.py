@@ -29,10 +29,12 @@ Args (Glue job parameters):
   --snapshot_date  required execution UTC date
   --run_id         required committed Silver run ID
   --iceberg_database  Glue database of the Gold Iceberg tables
+  --snapshot_retention_days  expire Iceberg snapshots older than this (never the pinned ones)
 """
 
 import json
 import sys
+from datetime import datetime, timedelta, timezone
 
 from pipeline_contract import read_json, silver_path, validate_manifest
 from pyspark.sql import DataFrame, SparkSession, Window
@@ -219,6 +221,13 @@ def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: 
 
 ICEBERG_CATALOG = "glue_catalog"   # Spark catalog name configured by the Glue job's --conf
 
+# Each commit writes a new metadata.json. Keep only the newest ones; snapshot expiry below cleans
+# up manifests and data files. 30 matches the snapshot retention default.
+TABLE_PROPERTIES = {
+    "write.metadata.delete-after-commit.enabled": "true",
+    "write.metadata.previous-versions-max": "30",
+}
+
 
 def write_iceberg(df: DataFrame, table: str, snapshot_date: str):
     """Replace one ``snapshot_date`` of an Iceberg table in a single atomic commit.
@@ -233,7 +242,10 @@ def write_iceberg(df: DataFrame, table: str, snapshot_date: str):
     namespace, name = table.rsplit(".", 1)
     existing = {row.tableName for row in spark.sql(f"SHOW TABLES IN {namespace}").collect()}
     if name not in existing:
-        df.writeTo(table).using("iceberg").partitionedBy(F.col("snapshot_date")).create()
+        writer = df.writeTo(table).using("iceberg").partitionedBy(F.col("snapshot_date"))
+        for key, value in TABLE_PROPERTIES.items():
+            writer = writer.tableProperty(key, value)
+        writer.create()
     else:
         condition = F.col("snapshot_date") == F.lit(snapshot_date).cast("date")
         # Call the JVM writer with the JVM column. PySpark 3.3 (Glue 4.0) passes the Python
@@ -261,6 +273,81 @@ def publish_iceberg(marts, *, run_id: str, snapshot_date: str, writer=write_iceb
     return record
 
 
+# ---- table maintenance ------------------------------------------------------------------------
+# Every nightly commit keeps the files it replaced, because older snapshots still reference them.
+# Expiring snapshots past a retention window bounds that growth. Readers are pinned to the snapshot
+# ids in the completion marker, so expiry never reaches back past those, however old they are.
+
+def snapshot_expiry_cutoff(now: datetime, retention_days: int, pinned_committed_at: datetime = None) -> datetime:
+    """Snapshots committed before this instant may be expired."""
+    cutoff = now - timedelta(days=retention_days)
+    if pinned_committed_at is not None and pinned_committed_at < cutoff:
+        return pinned_committed_at
+    return cutoff
+
+
+def pinned_snapshots(marker) -> dict:
+    """Table name -> snapshot id that readers query, from the completion marker (if any)."""
+    tables = (marker or {}).get("iceberg_snapshots") or {}
+    return {name: str(entry["snapshot_id"]) for name, entry in tables.items()}
+
+
+def snapshot_committed_at(spark: SparkSession, table: str, snapshot_id: str):
+    """Commit time (UTC) of one snapshot, or None if the table no longer has it."""
+    row = spark.sql(f"SELECT unix_millis(committed_at) AS ms FROM {table}.snapshots "
+                    f"WHERE snapshot_id = {int(snapshot_id)}").first()
+    return datetime.fromtimestamp(row.ms / 1000, tz=timezone.utc) if row else None
+
+
+def ensure_table_properties(spark: SparkSession, table: str) -> None:
+    """Set TABLE_PROPERTIES on a table created before they existed; no commit when already set."""
+    current = {r.key: r.value for r in spark.sql(f"SHOW TBLPROPERTIES {table}").collect()}
+    missing = {k: v for k, v in TABLE_PROPERTIES.items() if current.get(k) != v}
+    if missing:
+        pairs = ", ".join(f"'{k}' = '{v}'" for k, v in missing.items())
+        spark.sql(f"ALTER TABLE {table} SET TBLPROPERTIES ({pairs})")
+
+
+def expire_snapshots(spark: SparkSession, table: str, older_than: datetime) -> dict:
+    """Expire snapshots committed before ``older_than``, always keeping the newest one.
+
+    Iceberg deletes the data and manifest files that only expired snapshots used. Returns the
+    procedure's counts of deleted files.
+    """
+    ensure_table_properties(spark, table)
+    catalog, identifier = table.split(".", 1)
+    stamp = older_than.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    # The session time zone is UTC (set in main and in the tests), so the literal is UTC.
+    row = spark.sql(f"CALL {catalog}.system.expire_snapshots(table => '{identifier}', "
+                    f"older_than => TIMESTAMP '{stamp}', retain_last => 1)").first()
+    return {key: int(value) for key, value in row.asDict().items()}
+
+
+def maintain_iceberg(spark, tables, *, run_id: str, now: datetime, retention_days: int, pinned: dict,
+                     expire=expire_snapshots, committed_at=snapshot_committed_at) -> dict:
+    """Expire old snapshots of each table and return a record; never raises.
+
+    Housekeeping must not fail a run whose data is already committed, so each table's error is
+    recorded instead. A table whose pinned snapshot cannot be dated is left alone: expiring it by
+    age alone could delete the version the dashboard reads.
+    """
+    record = {"run_id": run_id, "retention_days": retention_days, "status": "SUCCEEDED", "tables": {}}
+    for table in tables:
+        name = table.rsplit(".", 1)[-1]
+        try:
+            pin = pinned.get(name)
+            pinned_at = committed_at(spark, table, pin) if pin else None
+            if pin and pinned_at is None:
+                raise ValueError(f"pinned snapshot {pin} not found in {name}; nothing expired")
+            cutoff = snapshot_expiry_cutoff(now, retention_days, pinned_at)
+            result = expire(spark, table, cutoff)
+            record["tables"][name] = {"older_than": cutoff.isoformat(), "pinned_snapshot_id": pin, **result}
+        except Exception as exc:  # noqa: BLE001 - recorded, see docstring
+            record["status"] = "FAILED"
+            record["tables"][name] = {"error_type": type(exc).__name__, "error": str(exc)[:1000]}
+    return record
+
+
 def main() -> None:
     import boto3
     from awsglue.context import GlueContext
@@ -268,7 +355,8 @@ def main() -> None:
     from awsglue.utils import getResolvedOptions
     from pyspark.context import SparkContext
 
-    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date", "iceberg_database"])
+    args = getResolvedOptions(sys.argv, ["JOB_NAME", "LAKE_BUCKET", "run_id", "snapshot_date", "iceberg_database",
+                                         "snapshot_retention_days"])
     snapshot_date, run_id = args["snapshot_date"], args["run_id"]
     bucket = args["LAKE_BUCKET"]
     s3 = boto3.client("s3")
@@ -314,6 +402,20 @@ def main() -> None:
     s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/run_id={run_id}.json",
                   Body=json.dumps(record).encode("utf-8"), ContentType="application/json")
     print(f"[silver_to_gold] committed Iceberg versions: {json.dumps(record)}")
+
+    # ---- housekeeping: expire old snapshots, never past what readers are pinned to -------------
+    # Runs under the same writer lock as the commits above, so no other write can interleave.
+    try:
+        pinned = pinned_snapshots(read_json(s3, bucket, "state/pipeline/latest.json", optional=True))
+        maintenance = maintain_iceberg(spark, [table for table, _ in marts], run_id=run_id,
+                                       now=datetime.now(timezone.utc),
+                                       retention_days=int(args["snapshot_retention_days"]), pinned=pinned)
+    except Exception as exc:  # noqa: BLE001 - e.g. the marker is unreadable: expire nothing
+        maintenance = {"run_id": run_id, "status": "FAILED", "error_type": type(exc).__name__,
+                       "error": str(exc)[:1000]}
+    s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/maintenance/run_id={run_id}.json",
+                  Body=json.dumps(maintenance).encode("utf-8"), ContentType="application/json")
+    print(f"[silver_to_gold] snapshot expiry: {json.dumps(maintenance)}")
 
     job.commit()
     print("[silver_to_gold] done")

@@ -124,6 +124,8 @@ data "aws_iam_policy_document" "gold" {
       "${aws_s3_bucket.lake.arn}/silver/runs/*",
       "${aws_s3_bucket.lake.arn}/state/silver/latest.json",
       "${aws_s3_bucket.lake.arn}/control/ingestion/*",
+      # Snapshot expiry reads which versions readers are pinned to (read only; it cannot publish).
+      "${aws_s3_bucket.lake.arn}/state/pipeline/latest.json",
     ]
   }
   statement {
