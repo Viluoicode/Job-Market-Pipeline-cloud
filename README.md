@@ -70,7 +70,7 @@ More: [architecture and invariants](docs/architecture.md) ·
 
 ## Results
 
-The dashboard reading the published snapshot of 21 November 2026 (UTC):
+The dashboard reading the published snapshot of 25 November 2026 (UTC):
 
 ![Dashboard overview: snapshot status, filters, KPIs, postings by role family and top employers](docs/screenshots/dashboard-overview.png)
 
