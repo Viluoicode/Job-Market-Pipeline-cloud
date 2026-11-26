@@ -41,7 +41,7 @@ locals {
       ResultPath = null
       Next       = "ReadGoldVersions"
     }
-    # The Gold job writes this record only after all three Iceberg commits succeeded. Its snapshot
+    # The Gold job writes this record only after all five Iceberg commits succeeded. Its snapshot
     # ids go into the completion marker, so readers query exactly the versions this run committed.
     ReadGoldVersions = {
       Type     = "Task"
@@ -64,6 +64,8 @@ locals {
           { Variable = "$.gold.record.tables.fact_job_posting.snapshot_id", IsPresent = true },
           { Variable = "$.gold.record.tables.demand_by_role.snapshot_id", IsPresent = true },
           { Variable = "$.gold.record.tables.role_opportunity.snapshot_id", IsPresent = true },
+          { Variable = "$.gold.record.tables.job_detail.snapshot_id", IsPresent = true },
+          { Variable = "$.gold.record.tables.skill_demand.snapshot_id", IsPresent = true },
         ]
         Next = "BuildCompletion"
       }]

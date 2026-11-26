@@ -155,13 +155,13 @@ Silver writes an immutable run, persists the data-quality result, and then advan
 `state/silver/latest.json`. Gold reads that exact committed run and replaces only the requested
 UTC `snapshot_date` partition, including when output is empty.
 
-Gold is three Apache Iceberg tables in the `<gold database>_iceberg` Glue database, with data and
+Gold is five Apache Iceberg tables in the `<gold database>_iceberg` Glue database, with data and
 metadata under `s3://<lake>/gold_iceberg/`. Each table commit is atomic and replaces exactly one
 `snapshot_date`, also when the mart is empty, so a reader sees the previous or the new version,
 never a half-written day. The Gold job creates and updates the tables itself; their schema comes
 from code, and there is no crawler.
 
-Iceberg is atomic per table, not across the three marts. So after its three commits the Gold job
+Iceberg is atomic per table, not across the five marts. So after its five commits the Gold job
 writes `state/gold_iceberg/run_id=<run>.json` with each table's new snapshot id (as text: ids
 exceed 2^53). Step Functions checks that this record belongs to the run, then copies the ids into
 `state/pipeline/latest.json`. Readers query `FOR VERSION AS OF <snapshot id>`, so they read one
@@ -188,6 +188,8 @@ The date boundary is UTC. For example, a run at 01:00 on 17 September in UTC+7 s
 | `fact_job_posting` | One active, fresh, content-unique posting | Inspect jobs, employers, locations, remote state, and application URLs |
 | `demand_by_role` | One configured role family per snapshot | Compare distinct posting demand |
 | `role_opportunity` | One configured role family per snapshot | Rank demand and expose remote share and top employer |
+| `job_detail` | One `fact_job_posting` row | Description, dictionary-matched skills and the salary the source published, for search and CV matching |
+| `skill_demand` | One role family (or all postings) and skill per snapshot | Rank skills by postings, with company count and share |
 
 Each posting belongs to at most one title-based role family (first match by priority; see
 [data-dictionary.md](data-dictionary.md#role-families--nhóm-role)), so role counts add up. These marts describe the configured
@@ -204,7 +206,7 @@ source sample and must not be presented as the whole labor market.
 - A committed ingestion run can be read again without changing its observation time.
 - Silver state advances only after validation, data quality, and Parquet output succeed.
 - Completion is published only from a Gold version record that matches the run and names all
-  three tables.
+  five tables.
 - The workflow has a 90-minute ceiling; Glue stages have independent timeouts.
 - Aborted or timed-out external jobs must be confirmed stopped before an orphaned lock is removed;
   the lock janitor automates this check and releases the lock conditionally on its owner.
@@ -290,9 +292,12 @@ opt-in via allow_bucket_force_destroy.
 ## Known limitations
 
 - Arbeitnow pagination is capped at two pages and is marked incomplete when more pages exist.
-- The three Gold tables commit separately; readers get a consistent set through the snapshot ids
+- The five Gold tables commit separately; readers get a consistent set through the snapshot ids
   in the completion marker, not through one multi-table transaction.
 - Role classification uses title rules rather than a trained semantic classifier.
+- Skills come from a fixed dictionary of 83 names; an employer's standard text can inflate a skill,
+  which `skill_demand.company_count` exposes. Salary exists for about 42% of postings, in the
+  published currency, and its period is often not stated.
 - Remote status depends on source metadata quality.
 - Lifecycle history from the current method begins with the September 2026 migration; earlier
   Gold snapshots used a different accumulated-Bronze method and are not trend-comparable.

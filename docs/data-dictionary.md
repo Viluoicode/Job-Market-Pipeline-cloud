@@ -9,6 +9,8 @@
 | `fact_job_posting` | One content-deduplicated, active and fresh posting per UTC snapshot | Dashboard base dataset |
 | `demand_by_role` | One title-rule role family per snapshot | Distinct posting counts; each posting is in at most one role, so counts add up |
 | `role_opportunity` | One role family per snapshot | Demand rank, `remote_pct` and `remote_unknown_pct` (both shares of all postings), top company; not personal fit |
+| `job_detail` | One `fact_job_posting` row (same `job_id`, `snapshot_date`) | Role family (as in `demand_by_role`, NULL if none), description, skills and published salary, for search and CV matching. See [Skills](#skills--kỹ-năng) and [Salary](#salary--lương) |
+| `skill_demand` | One role family (NULL = all postings) + skill per snapshot | Postings and companies naming the skill, share and rank |
 
 ## Key fields / Trường quan trọng
 
@@ -28,8 +30,60 @@
 | `snapshot_date` | Workflow start date in UTC; Glue Catalog exposes this partition as a string |
 | `posting_count` | 1 per fact record; sum yields fact posting count |
 
-Gold does not contain the full job description. Use the original posting link.
-Gold không lưu JD đầy đủ; mở link gốc để xem nội dung và tình trạng tuyển dụng.
+`job_detail.description` holds the first 20,000 characters of the plain-text description. It is
+the source's text at the last observation; open `apply_url` to check the posting is still open.
+`job_detail.description` lưu tối đa 20.000 ký tự đầu của JD dạng text; tình trạng tuyển dụng vẫn phải
+xem ở link gốc.
+
+## Skills / Kỹ năng
+
+`job_detail.skills` lists the canonical names from the `SKILLS` dictionary in
+`glue/jobs/silver_to_gold.py` (83 skills in 9 categories) found in the title or description.
+
+- Matching is case-insensitive on whole tokens: `java` does not match `javascript`, `sql` does
+  not match `nosql` or `mysql`, `c#` and `.net` are recognised.
+- English words are matched only in an unambiguous form: Go as `golang`, in a list ("Python, Go")
+  or in parentheses; React, Spark and Swift next to other technology; Spring only as Spring
+  Boot or a Spring module; Helm only as Helm charts.
+- The hiring company's own product is dropped (Databricks at Databricks, Elasticsearch at
+  Elastic, MongoDB at MongoDB): every posting on that board names it.
+- A skill named only in an employer's standard "about us" text still counts. `company_count` in
+  `skill_demand` shows when a skill comes from a few large boards. On 2026-11-26, 47% of Bronze
+  postings named no skill; most were not engineering roles.
+
+| `skill_demand` field | Meaning |
+| --- | --- |
+| `role` | Role family as in `demand_by_role`; NULL = all fact postings, classified or not |
+| `skill_rank` | 1 = most postings within the role scope (ties by skill name) |
+| `category` | `language`, `framework`, `cloud`, `devops`, `database`, `data`, `analytics`, `ml`, `practice` |
+| `job_count` / `company_count` | Distinct postings / companies in the scope naming the skill |
+| `posting_total` / `share_pct` | Postings in the scope / `job_count` as a percentage of it |
+
+## Salary / Lương
+
+Salary is read at ingestion only from fields the ATS publishes as data. Free text such as
+"competitive salary" is never parsed.
+
+| Source | Field | Coverage 2026-11-26 |
+| --- | --- | ---: |
+| Ashby | `compensation.summaryComponents` of type Salary | 58.4% |
+| Greenhouse | pay transparency block (`pay-range`) in the content HTML; first block only | 43.4% |
+| Lever | `salaryRange` | 10.3% |
+| Arbeitnow | none | 0% |
+
+Measured on 8,407 Bronze postings: 41.9% have a salary
+([evidence](evidence/salary-coverage-20261126.json)).
+
+| Field | Meaning |
+| --- | --- |
+| `salary_min`, `salary_max` | Amounts as published; a one-sided range repeats the value |
+| `salary_currency` | ISO code as published (USD 85%, then CAD, EUR, GBP); amounts are not converted |
+| `salary_interval` | `year`, `month`, `week`, `day`, `hour`, or NULL when the source does not say. Most Greenhouse blocks are titled just "Pay Range", so 48% of salaries have NULL here |
+| `salary_range_plausible` | `salary_max <= 4 x salary_min`; false flags source typos such as $152,405 to $179,300,152. NULL without salary |
+
+Compare salaries only within one currency and one known interval. Silver rows not observed since
+salary ingestion started keep NULL salary; Gold holds only postings seen in the last 26 hours, so
+it is complete from the first run with the new ingester.
 
 ## Dashboard metrics / Chỉ số
 

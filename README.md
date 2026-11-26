@@ -33,8 +33,9 @@ the result through Athena to a read-only Streamlit dashboard.
 2. A **Glue Python Shell** job calls the job-board APIs, five at a time, writes raw JSON to
    `bronze/` and then commits a run manifest. Later stages read only the objects it lists.
 3. A **Glue Spark** job builds Silver: it reconciles each posting's lifecycle and stops the run if
-   **Glue Data Quality** rules fail. A second Spark job commits three Gold marts as **Apache
-   Iceberg** tables, one atomic commit per table.
+   **Glue Data Quality** rules fail. A second Spark job commits five Gold marts as **Apache
+   Iceberg** tables, one atomic commit per table: postings, role demand, and the description,
+   skills and published salary of each posting.
 4. The workflow checks the Gold job's version record, then publishes a completion marker that names
    each table's Iceberg snapshot. **Athena** serves exactly those versions.
 5. A **Lambda** health monitor checks freshness every 15 minutes and alarms through **SNS**. A
@@ -60,7 +61,7 @@ More: [architecture and invariants](docs/architecture.md) ·
   written only from a Gold version record that matches this run. The dashboard checks the lock and
   the marker before and after it reads, and refuses stale or in-progress data.
 - **Atomic, pinned Gold with Apache Iceberg.** Each table replaces its day in one commit, and the
-  completion marker pins the three snapshot ids, so readers query one consistent set with
+  completion marker pins the five snapshot ids, so readers query one consistent set with
   `FOR VERSION AS OF`. The migration ran in shadow mode first and was compared with the old
   Parquet Gold row by row; it also removed the crawler, about 44% of Glue cost per run. Snapshots
   older than 30 days are expired nightly, never the version readers are pinned to.
@@ -152,8 +153,11 @@ Tests mock the source APIs and AWS clients; dated AWS evidence lives in [docs/ev
 - Role families come from job-title rules, one family per posting. Work mode depends on what each
   source states, and about 45% of postings state none; those are reported as "not stated".
 - Arbeitnow is read two pages deep and flagged as incomplete.
-- The three Gold tables commit separately; readers stay consistent through the pinned snapshot
+- The five Gold tables commit separately; readers stay consistent through the pinned snapshot
   ids rather than one multi-table transaction.
+- Skills are matched against a dictionary of 83 names. Salary is kept only where the source
+  publishes it as data, about 42% of postings, in its own currency; see the
+  [data dictionary](docs/data-dictionary.md#salary--lương).
 - Glue and supporting services cost money even when credits cover them, and budget alerts do not
   cap spending. Read [cost and security](docs/cost-and-security.md) and
   [cleanup](docs/operations.md#cleanup--kết-thúc-lab) before deploying or retiring a copy.
