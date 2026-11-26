@@ -104,6 +104,13 @@ the free tier; S3 and DynamoDB added cents per day. Gold can exceed one run's Br
 from a failed or incomplete board keep their last observation while still inside the freshness
 window ([why](docs/sample_results.md), [lifecycle](docs/architecture.md)).
 
+## Built on this pipeline
+
+[Job Market Radar](https://github.com/Viluoicode/job-market-radar) loads the published Gold into
+Postgres and serves skill trends, published salaries and job search through a .NET API. It reads
+only through the completion marker and the read-only reader role; the columns it depends on are
+listed in the [data dictionary](docs/data-dictionary.md#downstream-consumers--hệ-thống-dùng-gold).
+
 ## Tech stack
 
 AWS (S3, Glue Python Shell and Spark, Glue Data Quality, Step Functions, EventBridge, DynamoDB,

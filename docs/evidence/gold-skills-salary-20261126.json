@@ -1,0 +1,240 @@
+{
+  "checked_at": "2026-11-26T07:20:00+00:00",
+  "what": "First run with Gold job_detail and skill_demand (Glue 4.0): pinned versions, row parity with fact, skills, salary",
+  "execution": {
+    "name": "d365bd5a-51f8-4e7d-867b-906a919ef6df",
+    "status": "SUCCEEDED",
+    "started": "2026-11-26T06:55:05Z",
+    "stopped": "2026-11-26T07:05:12Z"
+  },
+  "snapshot_date": "2026-11-26",
+  "pinned_table_rows": {
+    "fact_job_posting": 9150,
+    "demand_by_role": 15,
+    "role_opportunity": 15,
+    "job_detail": 9150,
+    "skill_demand": 849
+  },
+  "athena_at_pinned_versions": {
+    "fact_rows": 9150,
+    "job_detail_rows": 9150,
+    "job_detail_joined_to_fact": 9150
+  },
+  "job_detail_coverage_pct": {
+    "with_skill_pct": 52.4,
+    "with_salary_pct": 38.1,
+    "annual_salary_pct": 19.0,
+    "with_role_pct": 38.1
+  },
+  "implausible_salary_ranges": 3,
+  "top_skills_all_postings": [
+    {
+      "skill_rank": "1",
+      "skill": "Python",
+      "job_count": "1899",
+      "company_count": "202",
+      "share_pct": "20.8"
+    },
+    {
+      "skill_rank": "2",
+      "skill": "AWS",
+      "job_count": "1307",
+      "company_count": "121",
+      "share_pct": "14.3"
+    },
+    {
+      "skill_rank": "3",
+      "skill": "SQL",
+      "job_count": "1160",
+      "company_count": "127",
+      "share_pct": "12.7"
+    },
+    {
+      "skill_rank": "4",
+      "skill": "Azure",
+      "job_count": "1075",
+      "company_count": "104",
+      "share_pct": "11.7"
+    },
+    {
+      "skill_rank": "5",
+      "skill": "GCP",
+      "job_count": "1065",
+      "company_count": "80",
+      "share_pct": "11.6"
+    },
+    {
+      "skill_rank": "6",
+      "skill": "LLM",
+      "job_count": "966",
+      "company_count": "112",
+      "share_pct": "10.6"
+    },
+    {
+      "skill_rank": "7",
+      "skill": "Kubernetes",
+      "job_count": "702",
+      "company_count": "105",
+      "share_pct": "7.7"
+    },
+    {
+      "skill_rank": "8",
+      "skill": "Java",
+      "job_count": "693",
+      "company_count": "58",
+      "share_pct": "7.6"
+    },
+    {
+      "skill_rank": "9",
+      "skill": "CI/CD",
+      "job_count": "666",
+      "company_count": "126",
+      "share_pct": "7.3"
+    },
+    {
+      "skill_rank": "10",
+      "skill": "Spark",
+      "job_count": "594",
+      "company_count": "39",
+      "share_pct": "6.5"
+    }
+  ],
+  "top_skills_data_engineer": [
+    {
+      "skill_rank": "1",
+      "skill": "Python",
+      "job_count": "58",
+      "share_pct": "64.4"
+    },
+    {
+      "skill_rank": "2",
+      "skill": "SQL",
+      "job_count": "57",
+      "share_pct": "63.3"
+    },
+    {
+      "skill_rank": "3",
+      "skill": "Spark",
+      "job_count": "40",
+      "share_pct": "44.4"
+    },
+    {
+      "skill_rank": "4",
+      "skill": "Airflow",
+      "job_count": "35",
+      "share_pct": "38.9"
+    },
+    {
+      "skill_rank": "5",
+      "skill": "dbt",
+      "job_count": "31",
+      "share_pct": "34.4"
+    },
+    {
+      "skill_rank": "6",
+      "skill": "ETL",
+      "job_count": "28",
+      "share_pct": "31.1"
+    },
+    {
+      "skill_rank": "7",
+      "skill": "Java",
+      "job_count": "26",
+      "share_pct": "28.9"
+    },
+    {
+      "skill_rank": "8",
+      "skill": "AWS",
+      "job_count": "20",
+      "share_pct": "22.2"
+    },
+    {
+      "skill_rank": "9",
+      "skill": "Databricks",
+      "job_count": "19",
+      "share_pct": "21.1"
+    },
+    {
+      "skill_rank": "10",
+      "skill": "Snowflake",
+      "job_count": "19",
+      "share_pct": "21.1"
+    }
+  ],
+  "usd_annual_median_midpoint_by_role": [
+    {
+      "role": "Research Scientist / Engineer",
+      "postings": "44",
+      "median_midpoint_usd": "440000.0"
+    },
+    {
+      "role": "Full Stack Engineer",
+      "postings": "33",
+      "median_midpoint_usd": "355500.0"
+    },
+    {
+      "role": "Data Scientist",
+      "postings": "23",
+      "median_midpoint_usd": "333000.0"
+    },
+    {
+      "role": "Engineering Manager",
+      "postings": "40",
+      "median_midpoint_usd": "317000.0"
+    },
+    {
+      "role": "Software Engineer (General)",
+      "postings": "162",
+      "median_midpoint_usd": "304000.0"
+    },
+    {
+      "role": "DevOps / SRE / Platform",
+      "postings": "55",
+      "median_midpoint_usd": "277500.0"
+    },
+    {
+      "role": "Security Engineer",
+      "postings": "33",
+      "median_midpoint_usd": "264500.0"
+    },
+    {
+      "role": "Mobile Engineer",
+      "postings": "21",
+      "median_midpoint_usd": "252262.5"
+    },
+    {
+      "role": "Backend Engineer",
+      "postings": "30",
+      "median_midpoint_usd": "247500.0"
+    },
+    {
+      "role": "ML / AI Engineer",
+      "postings": "35",
+      "median_midpoint_usd": "244500.0"
+    },
+    {
+      "role": "Forward Deployed / Solutions",
+      "postings": "72",
+      "median_midpoint_usd": "242500.0"
+    },
+    {
+      "role": "Data Engineer",
+      "postings": "19",
+      "median_midpoint_usd": "225792.5"
+    }
+  ],
+  "maintenance": {
+    "status": "SUCCEEDED",
+    "tables": 5,
+    "deleted_data_files": 0
+  },
+  "permissions": {
+    "passed": true,
+    "checks": 62
+  },
+  "dashboard_marker_validation": "passed (reads fact_job_posting only; extra tables ignored)",
+  "notes": [
+    "Skill UDF ran on Glue 4.0 with the module sent by value",
+    "Salary medians come from employers that publish pay (mostly large US tech and AI companies); they are not market-wide"
+  ]
+}
