@@ -129,6 +129,7 @@ def test_markdown_report_summarizes_runs():
         "billed": {"2026-11-19": {"APS1-ETL-DPU-Hour": 0.06, "APS1-Crawler-DPU-Hour": 0.05},
                    "2026-11-20": {"APS1-ETL-DPU-Hour": 0.07, "APS1-Crawler-DPU-Hour": 0.049},
                    "2026-11-21": {}},                              # today's bill is not in yet
+        "runs_per_day": {"2026-11-19": 1, "2026-11-20": 1, "2026-11-21": 1},
         "latest": {"snapshot_date": "2026-11-20", "bronze_rows": 8099, "successful_boards": 35,
                    "boards": 36, "silver_rows": 43540, "gold_rows": 8000, "dashboard_scan_bytes": 1048576},
     }
@@ -138,6 +139,7 @@ def test_markdown_report_summarizes_runs():
     assert "| Glue job cost (estimate) | $0.0695 |" in md
     assert "| Dashboard query scan | 1.0 MiB |" in md
     assert "8,099" in md and "43,540" in md
+    assert "Last 2 successful scheduled runs" in md
     assert "| Glue billed per run: jobs (Cost Explorer) | $0.0650 |" in md
     assert "| Glue billed per run: crawler (Cost Explorer) | $0.0495 |" in md
 
@@ -149,10 +151,63 @@ def test_markdown_omits_crawler_rows_once_runs_have_no_crawler():
            "glue_dpu_seconds": 500.0, "glue_cost_usd": 0.061}
     report = {"generated_at": "2026-11-27T00:00:00+00:00", "region": "ap-southeast-1",
               "price": {"usd_per_dpu_hour": 0.44, "usagetype": "APS1-ETL-DPU-Hour"}, "executions": [run],
-              "billed": {"2026-11-26": {"APS1-ETL-DPU-Hour": 0.06}},
+              "billed": {"2026-11-26": {"APS1-ETL-DPU-Hour": 0.06}}, "runs_per_day": {"2026-11-26": 1},
               "latest": {"snapshot_date": "2026-11-26", "bronze_rows": 1, "successful_boards": 36, "boards": 36,
                          "silver_rows": 2, "gold_rows": 3, "dashboard_scan_bytes": 1048576}}
     md = metrics.to_markdown(report)
     assert "| Crawl |" not in md
     assert "crawler" not in md
     assert "| Glue billed per run: jobs (Cost Explorer) | $0.0600 |" in md
+
+
+# ---- billed cost per run and run triggers -----------------------------------------------------
+SCHEDULED = "1dc39c4d-b58f-4c64-f0ab-ebe79733375c_c435bf36-af5c-5073-3cec-2083f31cba48"   # EventBridge
+MANUAL = "1d82b466-ef3a-4610-9dc9-09cebcda73d1"                                            # start-execution
+
+
+def test_scheduled_runs_are_told_apart_from_manual_ones():
+    assert metrics.is_scheduled(SCHEDULED)
+    assert not metrics.is_scheduled(MANUAL)
+    assert not metrics.is_scheduled("acceptance-run_2")
+
+
+def test_runs_per_day_counts_every_execution_by_its_utc_start():
+    # Cost Explorer bills by UTC day, whoever started the run and however it ended.
+    ict = timezone(timedelta(hours=7))
+    executions = [
+        {"name": MANUAL, "status": "SUCCEEDED", "startDate": datetime(2026, 11, 25, 12, 48, tzinfo=ict)},
+        {"name": MANUAL, "status": "SUCCEEDED", "startDate": datetime(2026, 11, 25, 22, 12, tzinfo=ict)},
+        {"name": SCHEDULED, "status": "FAILED", "startDate": datetime(2026, 11, 26, 1, 0, tzinfo=ict)},
+        {"name": SCHEDULED, "status": "SUCCEEDED", "startDate": datetime(2026, 11, 25, 1, 0, tzinfo=ict)},
+    ]
+    assert metrics.runs_per_day(executions) == {"2026-11-25": 3, "2026-11-24": 1}
+
+
+def billed_report(billed, runs_per_day, scheduled_only=True):
+    run = {"name": SCHEDULED, "start": "2026-11-25T18:00:16Z", "total_seconds": 517.0,
+           "stages": {"Ingest": 114.0, "BronzeToSilver": 235.0, "SilverToGold": 167.0, "Crawl": None},
+           "glue_dpu_seconds": 623.0, "glue_cost_usd": 0.0762}
+    return {"generated_at": "2026-11-26T02:00:00+00:00", "region": "ap-southeast-1",
+            "price": {"usd_per_dpu_hour": 0.44, "usagetype": "APS1-ETL-DPU-Hour"}, "executions": [run],
+            "billed": billed, "runs_per_day": runs_per_day, "scheduled_only": scheduled_only,
+            "latest": {"snapshot_date": "2026-11-25", "bronze_rows": 1, "successful_boards": 36, "boards": 36,
+                       "silver_rows": 2, "gold_rows": 3, "dashboard_scan_bytes": 1048576}}
+
+
+def test_a_days_bill_is_shared_by_every_run_that_day():
+    # 25 Nov 2026 (UTC) had four runs; the day's $0.2541 is not one run's cost.
+    md = metrics.to_markdown(billed_report(
+        {"2026-11-25": {"APS1-ETL-DPU-Hour": 0.2541, "APS1-Crawler-DPU-Hour": 0.0502}}, {"2026-11-25": 4}))
+    assert "| Glue billed per run: jobs (Cost Explorer) | $0.0635 |" in md
+    assert "| Glue billed per run: crawler (Cost Explorer) | $0.0126 |" in md
+    assert "day's bill divided by its 4 runs" in md
+
+
+def test_a_billed_day_with_no_known_runs_is_left_out():
+    md = metrics.to_markdown(billed_report({"2026-11-25": {"APS1-ETL-DPU-Hour": 0.25}}, {}))
+    assert "Glue billed per run" not in md
+
+
+def test_header_says_when_manual_runs_are_included():
+    md = metrics.to_markdown(billed_report({}, {}, scheduled_only=False))
+    assert "Last 1 successful runs (scheduled and manual)" in md
