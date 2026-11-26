@@ -84,3 +84,12 @@ def test_observation_validation_rejects_truncated_bronze_object(bronze):
         "status": "SUCCEEDED", "row_count": 2, "fetched_at": "2026-09-14T10:00:00Z"}]}
     with pytest.raises(ValueError, match="board counts"):
         b2s.validate_observations(raw, manifest)
+
+
+def test_previous_silver_without_salary_columns_still_reconciles(bronze):
+    # Silver written before salary ingestion has no salary columns; carried-forward rows read NULL.
+    previous = observed(bronze, [posting("ok", "1"), posting("ok", "2")], "2026-09-13T10:00:00Z").drop(*b2s.SALARY_COLUMNS)
+    current = observed(bronze, [posting("ok", "1")], "2026-09-14T10:00:00Z").withColumn("salary_min", F.lit(5.0))
+    rows = {r.source_job_id: r for r in b2s.reconcile_lifecycle(current, previous, [], "2026-09-14T10:05:00Z").collect()}
+    assert rows["1"].salary_min == 5.0
+    assert rows["2"].salary_min is None and rows["2"].salary_currency is None

@@ -125,10 +125,96 @@ def _remote_from_workplace(workplace):
     return None
 
 
+# --------------------------------------------------------------------------- salary
+# Salary is read only from fields the ATS publishes as data (Ashby compensation, Lever salaryRange,
+# Greenhouse's pay-transparency block). Free text like "competitive pay" is never parsed: a missing
+# salary stays NULL so coverage can be reported honestly.
+SALARY_INTERVALS = ("year", "month", "week", "day", "hour")
+_NO_SALARY = {"salary_min": None, "salary_max": None, "salary_currency": None, "salary_interval": None}
+_GH_PAY_RANGE = re.compile(
+    r'<div class="title">(?P<title>[^<]*)</div>\s*<div class="pay-range">(?P<body>.*?)</div>', re.S)
+_GH_SPAN = re.compile(r"<span>([^<]*)</span>")
+_CURRENCY_CODE = re.compile(r"\b([A-Z]{3})\s*$")
+
+
+def _interval(text) -> str | None:
+    """'1 YEAR', 'per-year-salary', 'Annual Pay Range' -> 'year'; unknown -> None."""
+    text = (text or "").lower()
+    if "annual" in text or "yearly" in text:
+        return "year"
+    return next((unit for unit in SALARY_INTERVALS if unit in text), None)
+
+
+def _amount(value) -> float | None:
+    """A positive number, or a display amount like '$58,000', '€114.000' or '£45,500.50'."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) if value > 0 else None
+    digits = re.sub(r"[^0-9.,]", "", value or "")
+    if not digits or not digits[0].isdigit():
+        return None
+    if "," in digits and "." in digits:  # the right-most separator is the decimal point
+        decimal = "," if digits.rfind(",") > digits.rfind(".") else "."
+        digits = digits.replace("." if decimal == "," else ",", "").replace(decimal, ".")
+    else:
+        sep = "," if "," in digits else "."
+        groups = digits.split(sep)
+        # 58,000 / 114.000 / 1.250.000 are thousands; 45.5 / 12,75 are decimals.
+        is_thousands = len(groups) > 1 and all(len(g) == 3 for g in groups[1:])
+        digits = "".join(groups) if is_thousands else digits.replace(sep, ".")
+    try:
+        number = float(digits)
+    except ValueError:
+        return None
+    return number if number > 0 else None
+
+
+def _salary(low, high, currency, interval) -> dict:
+    low, high = _amount(low), _amount(high)
+    if low is None and high is None:
+        return dict(_NO_SALARY)
+    low, high = low or high, high or low
+    if low > high:
+        return dict(_NO_SALARY)
+    # Greenhouse often titles the block just "Pay Range": keep the amounts, leave the period NULL
+    # rather than guess annual vs hourly. Consumers compare salaries only within one known period.
+    currency = currency.strip().upper() if isinstance(currency, str) and currency.strip() else None
+    return {"salary_min": low, "salary_max": high, "salary_currency": currency, "salary_interval": interval}
+
+
+def extract_salary(source: str, job) -> dict:
+    """Structured salary of one raw ATS posting, or all-NULL fields. Never raises on odd payloads."""
+    if not isinstance(job, dict):
+        return dict(_NO_SALARY)
+    if source == "ashby":
+        comp = get_child(job, "compensation") or {}
+        parts = comp.get("summaryComponents") if isinstance(comp.get("summaryComponents"), list) else []
+        for part in parts:
+            if isinstance(part, dict) and part.get("compensationType") == "Salary":
+                return _salary(part.get("minValue"), part.get("maxValue"), part.get("currencyCode"),
+                               _interval(part.get("interval")))
+    elif source == "lever":
+        rng = get_child(job, "salaryRange")
+        if rng:
+            return _salary(rng.get("min"), rng.get("max"), rng.get("currency"), _interval(rng.get("interval")))
+    elif source == "greenhouse":
+        # Greenhouse renders pay transparency as a titled block; the first block is the primary range.
+        match = _GH_PAY_RANGE.search(html.unescape(get_str(job, "content") or ""))
+        if match:
+            spans = [s.strip() for s in _GH_SPAN.findall(match["body"])]
+            values = [s for s in spans if any(ch.isdigit() for ch in s)]
+            if values:
+                code = _CURRENCY_CODE.search(values[-1])
+                return _salary(values[0], values[-1], code[1] if code else None, _interval(match["title"]))
+    return dict(_NO_SALARY)
+
+
 def _record(source, board_token, source_job_id, company, title, location, remote,
             description, apply_url, posted_at, raw) -> dict:
     """One canonical Bronze posting (flat — Glue reads these columns directly)."""
     return {
+        **extract_salary(source, raw),
         "source": source,
         "board_token": board_token,
         "source_job_id": source_job_id,

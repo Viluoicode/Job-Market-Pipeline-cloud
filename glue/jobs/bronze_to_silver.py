@@ -122,6 +122,16 @@ def parse_ts(colname: str):
     )
 
 
+SALARY_COLUMNS = ("salary_min", "salary_max", "salary_currency", "salary_interval")
+
+
+def salary_columns(raw: DataFrame):
+    """Typed salary fields; Bronze written before salary ingestion has none, so they are NULL."""
+    types = {"salary_min": "double", "salary_max": "double"}
+    return [(F.col(c) if c in raw.columns else F.lit(None)).cast(types.get(c, "string")).alias(c)
+            for c in SALARY_COLUMNS]
+
+
 def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
     """Type the raw Bronze JSON, compute job_id + dedup_hash, keep one row per job_id.
 
@@ -142,6 +152,7 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
             F.col("apply_url").cast("string").alias("apply_url"),
             parse_ts("posted_at").alias("posted_at"),
             F.col("description").cast("string").alias("description"),
+            *salary_columns(raw),
             observed_ts.alias("observed_at"),
         )
         .where(F.col("source_job_id").isNotNull() & (F.col("source_job_id") != ""))
@@ -170,7 +181,8 @@ def build_silver(raw: DataFrame, snapshot_date: str) -> DataFrame:
         .select(
             "job_id", "source", "source_job_id", "board_token", "company", "title",
             "location", "is_remote", "apply_url", "posted_at", "dedup_hash",
-            "first_seen_at", "last_seen_at", "is_active", "is_fresh", "status_reason", "description", "snapshot_date",
+            "first_seen_at", "last_seen_at", "is_active", "is_fresh", "status_reason", "description",
+            *SALARY_COLUMNS, "snapshot_date",
         )
     )
 
@@ -201,7 +213,8 @@ def reconcile_lifecycle(current, previous, complete_boards, observed_at,
         .withColumn("is_fresh", F.col("last_seen_at") >= clock - F.expr(f"INTERVAL {int(freshness_hours)} HOURS"))
         .withColumn("snapshot_date", F.to_date(clock))
         .drop("board_complete"))
-    return observed.unionByName(missing)
+    # Postings last seen before salary was ingested have no salary columns: they read as NULL.
+    return observed.unionByName(missing, allowMissingColumns=True)
 
 
 def validate_observations(raw, manifest):
@@ -249,10 +262,11 @@ def main() -> None:
         job.commit()
         return
 
-    from pyspark.sql.types import BooleanType, StringType, StructField, StructType
+    from pyspark.sql.types import BooleanType, DoubleType, StringType, StructField, StructType
     columns = ["source", "board_token", "source_job_id", "company", "title", "location",
-               "remote", "description", "apply_url", "posted_at", "run_id", "fetched_at"]
-    schema = StructType([StructField(c, BooleanType() if c == "remote" else StringType()) for c in columns])
+               "remote", "description", "apply_url", "posted_at", "run_id", "fetched_at", *SALARY_COLUMNS]
+    types = {"remote": BooleanType(), "salary_min": DoubleType(), "salary_max": DoubleType()}
+    schema = StructType([StructField(c, types.get(c, StringType())) for c in columns])
     raw = spark.read.schema(schema).option("mode", "FAILFAST").json([f"s3://{bucket}/{key}" for key in keys]).cache()
     validate_observations(raw, manifest)
     current = build_silver(raw, snapshot_date)

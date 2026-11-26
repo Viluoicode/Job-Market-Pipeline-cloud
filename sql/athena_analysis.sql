@@ -71,3 +71,25 @@ WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg
   AND lower(title) LIKE '%data engineer%'
 ORDER BY company
 LIMIT 50;
+
+-- 8) Top skills across all postings (role IS NULL) and for Data Engineer. company_count shows
+--    whether a skill is spread across employers or comes from a few large boards.
+SELECT coalesce(role, 'All postings') AS scope, skill_rank, skill, category,
+       job_count, company_count, share_pct
+FROM jobmarket_aws_gold_iceberg.skill_demand
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.skill_demand)
+  AND (role IS NULL OR role = 'Data Engineer')
+  AND skill_rank <= 15
+ORDER BY scope, skill_rank;
+
+-- 9) Published annual salaries in USD by role family. Only plausible ranges with a stated period;
+--    approx_percentile is the midpoint median, not an average of offers.
+SELECT role,
+       count(*)                                                    AS postings_with_salary,
+       approx_percentile((salary_min + salary_max) / 2, 0.5)       AS median_midpoint_usd
+FROM jobmarket_aws_gold_iceberg.job_detail
+WHERE snapshot_date = (SELECT max(snapshot_date) FROM jobmarket_aws_gold_iceberg.job_detail)
+  AND role IS NOT NULL
+  AND salary_currency = 'USD' AND salary_interval = 'year' AND salary_range_plausible
+GROUP BY role
+ORDER BY median_midpoint_usd DESC;

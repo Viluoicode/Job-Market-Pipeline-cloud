@@ -218,6 +218,17 @@ ICEBERG_SCRIPT = textwrap.dedent("""
     before = spark.sql(f"SELECT count(*) c FROM {old}.metadata_log_entries").first().c
     s2g.ensure_table_properties(spark, old)                                          # idempotent: no new commit
     assert spark.sql(f"SELECT count(*) c FROM {old}.metadata_log_entries").first().c == before
+
+    # job_detail carries an array column (skills) and NULL salaries: create, then replace a day.
+    jd = "test.gold.job_detail"
+    def detail(d, skills):
+        df = spark.createDataFrame([("j1", "Python and SQL", skills, None, d)],
+                                   "job_id string, description string, skills array<string>, "
+                                   "salary_min double, snapshot_date string")
+        return df.withColumn("snapshot_date", F.col("snapshot_date").cast("date"))
+    s2g.write_iceberg(detail("2026-11-20", ["Python"]), jd, "2026-11-20")
+    s2g.write_iceberg(detail("2026-11-20", ["Python", "SQL"]), jd, "2026-11-20")
+    assert [r.skills for r in spark.table(jd).collect()] == [["Python", "SQL"]]
     print("ICEBERG_OK")
 """)
 

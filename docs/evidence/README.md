@@ -7,6 +7,7 @@ observed at a specific time; they are not a live status page.
 | --- | --- |
 | `iceberg-parity-<date>.json` | Shadow Iceberg Gold vs published Parquet Gold for one snapshot: row counts of all marts, row-level fact differences, verdict (task 5.1 phase A). 22, 24 and 25 Nov match; 23 Nov records the Spark 3.3 overwrite failure fixed before the switch |
 | `run-metrics-20261125-iceberg.json` | First run after the Iceberg switch (phase B): stage timing, Glue DPU/cost, row counts, dashboard scan |
+| `salary-coverage-20261126.json` | Salary coverage of one real Bronze run (8,407 postings) measured with the new extractor before deploying it: per source, interval, currency, implausible ranges |
 | `iceberg-maintenance-20261125.json` | First nightly Iceberg snapshot expiry on AWS: cutoff per table, pinned snapshot, deleted file counts, metadata retention properties |
 | `security-permissions-20261125.json` | IAM allowed/denied simulations and S3 guardrails after the Iceberg switch and crawler removal (60/60) |
 | `run-metrics-20261121.json` | Baseline before parallel fetch/Iceberg: stage timing, Glue DPU/cost (Pricing API + Cost Explorer), row counts, dashboard scan for 7 scheduled runs |

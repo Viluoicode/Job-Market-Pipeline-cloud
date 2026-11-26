@@ -1,0 +1,57 @@
+{
+  "checked_at": "2026-11-26T06:08:09+00:00",
+  "what": "Salary coverage of one real Bronze run, measured with ingestion/land_to_bronze.extract_salary before deploying it",
+  "bronze_run_id": "1dc39c4d-b58f-4c64-f0ab-ebe79733375c_c435bf36-af5c-5073-3cec-2083f31cba48",
+  "method": "Structured fields only: Ashby compensation.summaryComponents (Salary), Lever salaryRange, Greenhouse pay-range block in content HTML. Free text is not parsed. Bronze rows before dedup.",
+  "by_source": {
+    "arbeitnow": {
+      "postings": 600,
+      "with_salary": 0,
+      "coverage_pct": 0.0
+    },
+    "ashby": {
+      "postings": 1948,
+      "with_salary": 1137,
+      "coverage_pct": 58.4
+    },
+    "greenhouse": {
+      "postings": 5384,
+      "with_salary": 2336,
+      "coverage_pct": 43.4
+    },
+    "lever": {
+      "postings": 475,
+      "with_salary": 49,
+      "coverage_pct": 10.3
+    }
+  },
+  "total": {
+    "postings": 8407,
+    "with_salary": 3522,
+    "coverage_pct": 41.9
+  },
+  "interval": {
+    "year": 1750,
+    "unstated": 1697,
+    "hour": 60,
+    "month": 15
+  },
+  "currency_top": {
+    "USD": 2992,
+    "CAD": 235,
+    "EUR": 168,
+    "GBP": 31,
+    "PLN": 28,
+    "INR": 18,
+    "SGD": 11,
+    "NOK": 8
+  },
+  "implausible_ranges": {
+    "count": 3,
+    "rule": "salary_max > 4 x salary_min (source typos such as $152,405 - $179,300,152)"
+  },
+  "notes": [
+    "Greenhouse usually titles the block 'Pay Range' without a period, so salary_interval stays NULL instead of being guessed",
+    "Arbeitnow publishes no salary field"
+  ]
+}

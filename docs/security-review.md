@@ -77,7 +77,7 @@ python scripts/check_permissions.py --lake (terraform -chdir=infra output -raw l
 
 The command requires an operator with IAM simulation/configuration-read permissions. The dashboard
 reader is intentionally not allowed to audit IAM. Gold still lacks an atomic transaction across its
-three marts; publication checks and the lock reduce exposure but do not add storage transactions.
+five marts; publication checks and the lock reduce exposure but do not add storage transactions.
 
 ## IaC scan (Checkov) / Quét bảo mật hạ tầng — 2026-11-21
 

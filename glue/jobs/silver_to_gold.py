@@ -1,6 +1,6 @@
 """Glue (PySpark) — Silver -> Gold.
 
-Reads typed Silver Parquet for one ``snapshot_date`` and writes three Gold marts as Apache Iceberg
+Reads typed Silver Parquet for one ``snapshot_date`` and writes five Gold marts as Apache Iceberg
 tables (database ``--iceberg_database``, data under ``s3://<lake>/gold_iceberg/``):
 
   * ``fact_job_posting`` — one row per ACTIVE posting, deduplicated cross-source by content
@@ -12,9 +12,13 @@ tables (database ``--iceberg_database``, data under ``s3://<lake>/gold_iceberg/`
   * ``role_opportunity`` — the DECISION mart: per role, demand rank + remote share + the
     single top-hiring company, so the question "which role should I learn / apply for?" has one
     table to answer it. Enriches ``demand_by_role`` with the columns a candidate actually decides on.
+  * ``job_detail``       — per fact posting: description, skills found in title + description
+    (dictionary ``SKILLS``) and the salary the ATS published as data. Feeds search and matching.
+  * ``skill_demand``     — per role family (NULL = all postings) and skill: postings, companies,
+    share and rank.
 
 Each table is partitioned by ``snapshot_date`` and each day is replaced in one atomic commit, so a
-reader sees the previous version or the new one, never half a day. The job records the three new
+reader sees the previous version or the new one, never half a day. The job records the new
 snapshot ids in ``state/gold_iceberg/run_id=<run>.json``; Step Functions copies them into the
 completion marker, and readers query that exact version. The schema comes from this code: there is
 no crawler. (Until 2026-11 the marts were plain Parquet under ``gold/``; those files are kept.)
@@ -33,12 +37,14 @@ Args (Glue job parameters):
 """
 
 import json
+import re
 import sys
 from datetime import datetime, timedelta, timezone
 
 from pipeline_contract import read_json, silver_path, validate_manifest
 from pyspark.sql import DataFrame, SparkSession, Window
 from pyspark.sql import functions as F
+from pyspark.sql.types import ArrayType, StringType
 
 # Role taxonomy: each posting gets AT MOST ONE role family, the first one (top to bottom) with a
 # regex matching its lower-cased title; titles matching ROLE_EXCLUDE get none. Families are ordered
@@ -114,6 +120,160 @@ ROLE_PATTERNS = [(0, None, regex) for regex in ROLE_EXCLUDE] + [
     for regex in regexes
 ]
 ROLE_FAMILIES = list(dict.fromkeys(role for role, _ in DEFAULT_ROLES))
+
+
+# Skill dictionary: (canonical name, category, alias regexes). Matched case-insensitively in the
+# title plus description. A token boundary excludes letters, digits and + # so "java" does not
+# match "javascript" and "sql" does not match "nosql"/"mysql". Ambiguous English words are only
+# matched in an unambiguous form ("go" next to another language, "excel" as a product).
+SKILLS = [
+    # Languages
+    ("Python", "language", [r"python"]),
+    ("Java", "language", [r"java"]),
+    ("JavaScript", "language", [r"javascript", r"ecmascript"]),
+    ("TypeScript", "language", [r"typescript"]),
+    # "go" alone is an English verb: count it only as golang or as an item of a list or parenthesis.
+    ("Go", "language", [r"golang",
+                        r"go(?= ?(?:,|/| and | or ) ?(?:python|java|rust|c\+\+|kotlin|typescript|scala|ruby))",
+                        r"(?<=, )go(?=,| and | or |\))", r"(?<=\()go(?=\))"]),
+    ("Rust", "language", [r"rust"]),
+    ("C++", "language", [r"c\+\+", r"cpp"]),
+    ("C#", "language", [r"c#", r"c sharp"]),
+    ("Kotlin", "language", [r"kotlin"]),
+    ("Swift", "language", [r"swift(?=ui| ?(?:,|/|and)| programming| development)", r"swiftui"]),
+    ("Scala", "language", [r"scala"]),
+    ("Ruby", "language", [r"ruby"]),
+    ("PHP", "language", [r"php"]),
+    ("SQL", "language", [r"sql"]),
+    ("Bash", "language", [r"bash", r"shell scripting"]),
+    # Frameworks and runtimes
+    (".NET", "framework", [r"\.net(?: core)?", r"asp\.net", r"dotnet"]),
+    ("Node.js", "framework", [r"node\.?js"]),
+    ("React", "framework", [r"react\.?js", r"react native", r"react(?= ?(?:,|/| and | or |\)))", r"(?<=, )react",
+                            r"react(?= (?:hooks|redux|components?|query))"]),
+    ("Angular", "framework", [r"angular(?:js)?"]),
+    ("Vue", "framework", [r"vue(?:\.?js)?"]),
+    ("Next.js", "framework", [r"next\.?js"]),
+    ("Django", "framework", [r"django"]),
+    ("Flask", "framework", [r"flask"]),
+    ("FastAPI", "framework", [r"fastapi"]),
+    ("Spring", "framework", [r"spring boot", r"spring (?:framework|mvc|cloud|data|security)"]),
+    ("Rails", "framework", [r"ruby on rails"]),
+    ("GraphQL", "framework", [r"graphql"]),
+    ("gRPC", "framework", [r"grpc"]),
+    # Cloud
+    ("AWS", "cloud", [r"aws", r"amazon web services"]),
+    ("GCP", "cloud", [r"gcp", r"google cloud(?: platform)?"]),
+    ("Azure", "cloud", [r"azure"]),
+    # DevOps and infrastructure
+    ("Docker", "devops", [r"docker"]),
+    ("Kubernetes", "devops", [r"kubernetes", r"k8s", r"eks", r"gke", r"aks"]),
+    ("Terraform", "devops", [r"terraform"]),
+    ("Ansible", "devops", [r"ansible"]),
+    ("Helm", "devops", [r"helm charts?"]),
+    ("CI/CD", "devops", [r"ci/cd", r"ci ?/ ?cd", r"continuous integration"]),
+    ("GitHub Actions", "devops", [r"github actions"]),
+    ("Jenkins", "devops", [r"jenkins"]),
+    ("Linux", "devops", [r"linux"]),
+    ("Prometheus", "devops", [r"prometheus"]),
+    ("Grafana", "devops", [r"grafana"]),
+    ("Datadog", "devops", [r"datadog"]),
+    # Databases
+    ("PostgreSQL", "database", [r"postgres(?:ql)?"]),
+    ("MySQL", "database", [r"mysql"]),
+    ("SQL Server", "database", [r"sql server", r"mssql"]),
+    ("Oracle", "database", [r"oracle(?= ?(?:db|database|sql|pl/sql))", r"pl/sql"]),
+    ("MongoDB", "database", [r"mongo(?:db)?"]),
+    ("Redis", "database", [r"redis"]),
+    ("Cassandra", "database", [r"cassandra"]),
+    ("DynamoDB", "database", [r"dynamodb"]),
+    ("Elasticsearch", "database", [r"elasticsearch", r"elastic search", r"opensearch"]),
+    ("NoSQL", "database", [r"nosql"]),
+    # Data engineering
+    ("Spark", "data", [r"apache spark", r"pyspark", r"spark (?:sql|streaming|jobs?|clusters?)",
+                       r"spark(?= ?(?:,|/| and | or |\)))", r"(?<=, )spark"]),
+    ("Kafka", "data", [r"kafka"]),
+    ("Airflow", "data", [r"airflow"]),
+    ("dbt", "data", [r"dbt"]),
+    ("Snowflake", "data", [r"snowflake"]),
+    ("BigQuery", "data", [r"bigquery"]),
+    ("Redshift", "data", [r"redshift"]),
+    ("Databricks", "data", [r"databricks"]),
+    ("Hadoop", "data", [r"hadoop", r"hdfs", r"hive"]),
+    ("Flink", "data", [r"flink"]),
+    ("Iceberg", "data", [r"apache iceberg", r"iceberg tables?"]),
+    ("ETL", "data", [r"etl", r"elt"]),
+    # Analytics
+    ("Tableau", "analytics", [r"tableau"]),
+    ("Power BI", "analytics", [r"power ?bi"]),
+    ("Looker", "analytics", [r"looker"]),
+    ("Excel", "analytics", [r"(?:microsoft|ms) excel", r"excel(?= ?(?:,|/|and) ?(?:sql|python|tableau|power ?bi))"]),
+    ("pandas", "analytics", [r"pandas"]),
+    # ML and AI
+    ("PyTorch", "ml", [r"pytorch"]),
+    ("TensorFlow", "ml", [r"tensorflow", r"keras"]),
+    ("scikit-learn", "ml", [r"scikit-learn", r"sklearn"]),
+    ("LLM", "ml", [r"llms?", r"large language models?"]),
+    ("RAG", "ml", [r"rag", r"retrieval[- ]augmented generation"]),
+    ("NLP", "ml", [r"nlp", r"natural language processing"]),
+    ("Computer Vision", "ml", [r"computer vision"]),
+    ("MLOps", "ml", [r"mlops"]),
+    ("Hugging Face", "ml", [r"hugging ?face"]),
+    # Practices
+    ("Microservices", "practice", [r"micro-?services"]),
+    ("REST API", "practice", [r"rest(?:ful)? apis?", r"rest services"]),
+    ("Git", "practice", [r"git(?!hub|lab)"]),
+    ("Agile", "practice", [r"agile", r"scrum"]),
+]
+SKILL_CATEGORY = {name: category for name, category, _ in SKILLS}
+SKILL_TEXT_LIMIT = 20000   # characters of description read per posting (titles are always read)
+def _literal_prefix(alias: str) -> str:
+    """The plain text every match of ``alias`` starts with ("" if none): a cheap substring gate."""
+    alias = re.sub(r"^\(\?<[=!][^)]*\)", "", alias)   # a leading lookbehind consumes nothing
+    out, i = [], 0
+    while i < len(alias):
+        char, step = alias[i], 1
+        if char == "\\" and i + 1 < len(alias) and not alias[i + 1].isalnum():
+            char, step = alias[i + 1], 2
+        elif not (char.isalnum() or char in " #/-,"):
+            break
+        if alias[i + step:i + step + 1] in ("?", "*", "{"):   # an optional char ends the literal
+            break
+        out.append(char.lower())
+        i += step
+    return "".join(out)
+
+
+# One regex per skill, gated by its aliases' literal prefixes: most postings mention a handful of
+# the skills, so a substring test skips almost every regex (a single 83-way alternation was ~50x
+# slower because every text position tried every branch).
+_SKILL_MATCHERS = [
+    (name, tuple(_literal_prefix(a) for a in aliases),
+     re.compile(f"(?<![a-z0-9+#])(?:{'|'.join(aliases)})(?![a-z0-9+#])", re.IGNORECASE))
+    for name, _, aliases in SKILLS
+]
+
+
+def _key(value) -> str:
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def is_employer_name(skill: str, company) -> bool:
+    """True when the skill is the hiring company's own product (Databricks at Databricks, Elastic ->
+    Elasticsearch): every posting of that board names it, so it says nothing about the job."""
+    skill_key, company_key = _key(skill), _key(company)
+    if min(len(skill_key), len(company_key)) < 4:   # "Go" must not drop for a company called "Gong"
+        return False
+    return skill_key.startswith(company_key) or company_key.startswith(skill_key)
+
+
+def extract_skills(title, description, company=None) -> list:
+    """Sorted distinct canonical skills named in a posting's title or (truncated) description."""
+    text = f"{title or ''}\n{(description or '')[:SKILL_TEXT_LIMIT]}"
+    lower = text.lower()
+    return sorted(name for name, prefixes, regex in _SKILL_MATCHERS
+                  if any(p in lower for p in prefixes) and not is_employer_name(name, company)
+                  and regex.search(text))
 
 
 def make_roles_df(spark: SparkSession) -> DataFrame:
@@ -216,6 +376,70 @@ def build_role_opportunity(fact: DataFrame, roles_df: DataFrame, snapshot_date: 
             "top_company", "top_company_count", "snapshot_date",
         )
         .orderBy("demand_rank")
+    )
+
+
+SALARY_COLUMNS = ("salary_min", "salary_max", "salary_currency", "salary_interval")
+SALARY_PLAUSIBLE_RATIO = 4   # a published max above 4x the min is a source typo, not a range
+
+
+def build_job_detail(fact: DataFrame, silver: DataFrame, roles_df: DataFrame) -> DataFrame:
+    """job_detail: per fact posting, the text and the fields extracted from it.
+
+    One row per fact_job_posting row (join on job_id). ``role`` is the posting's role family as
+    counted in demand_by_role (NULL when none matched). ``skills`` comes from the title + description
+    (see SKILLS), minus the employer's own product. Salary is what the ATS published as data, NULL
+    otherwise; ``salary_interval`` is NULL when the source did not say per year/month/hour.
+    """
+    salary = [F.col(c) if c in silver.columns else F.lit(None).cast("double" if c.endswith(("min", "max")) else
+                                                                     "string").alias(c) for c in SALARY_COLUMNS]
+    if __name__ != "__main__":
+        # Ship the skill matcher to the Python workers by value: they cannot import this script as
+        # a module (on Glue it runs as __main__, which cloudpickle already sends by value).
+        from pyspark import cloudpickle
+        cloudpickle.register_pickle_by_value(sys.modules[__name__])
+    skills = F.udf(extract_skills, ArrayType(StringType()))
+    detail = (fact.select("job_id", "title", "company", "snapshot_date")
+              .join(silver.select("job_id", "description", *salary), "job_id")
+              .join(_role_bridge(fact, roles_df).select("job_id", "role"), "job_id", "left"))
+    return detail.select(
+        "job_id", "role",
+        F.substring(F.coalesce("description", F.lit("")), 1, SKILL_TEXT_LIMIT).alias("description"),
+        skills("title", "description", "company").alias("skills"),
+        *SALARY_COLUMNS,
+        F.when(F.col("salary_min").isNotNull(),
+               F.col("salary_max") <= SALARY_PLAUSIBLE_RATIO * F.col("salary_min")).alias("salary_range_plausible"),
+        "snapshot_date",
+    )
+
+
+def build_skill_demand(job_detail: DataFrame, fact: DataFrame, roles_df: DataFrame, snapshot_date: str) -> DataFrame:
+    """skill_demand: per role family and skill, the postings that name the skill.
+
+    ``role`` NULL is the scope of all postings, matched to a role family or not. ``share_pct`` is
+    job_count / posting_total of that scope. ``company_count`` shows concentration: a skill named
+    in one large employer's boilerplate has many postings but few companies.
+    """
+    all_scope = "\u0000all"   # internal key only: NULL does not join with "="
+    jobs = fact.select("job_id", "company")
+    scoped = jobs.withColumn("_scope", F.lit(all_scope)).unionByName(
+        jobs.join(_role_bridge(fact, roles_df).select("job_id", F.col("role").alias("_scope")), "job_id"))
+    totals = scoped.groupBy("_scope").agg(F.countDistinct("job_id").alias("posting_total"))
+    mentions = job_detail.select("job_id", F.explode("skills").alias("skill"))
+    counts = scoped.join(mentions, "job_id").groupBy("_scope", "skill").agg(
+        F.countDistinct("job_id").alias("job_count"), F.countDistinct("company").alias("company_count"))
+    categories = F.create_map(*[F.lit(v) for pair in SKILL_CATEGORY.items() for v in pair])
+    rank = Window.partitionBy("_scope").orderBy(F.col("job_count").desc(), F.col("skill"))
+    return (
+        counts.join(totals, "_scope")
+        .withColumn("skill_rank", F.row_number().over(rank))
+        .select(
+            F.when(F.col("_scope") != all_scope, F.col("_scope")).alias("role"),
+            "skill_rank", "skill", categories[F.col("skill")].alias("category"),
+            "job_count", "company_count", "posting_total",
+            F.round(100.0 * F.col("job_count") / F.col("posting_total"), 1).alias("share_pct"),
+            F.lit(snapshot_date).cast("date").alias("snapshot_date"),
+        )
     )
 
 
@@ -394,9 +618,17 @@ def main() -> None:
             f"top={row['top_company']} ({row['top_company_count']})"
         )
 
+    # ---- job_detail + skill_demand (text, skills and salary for downstream products) ----------
+    detail = build_job_detail(fact, silver, roles_df).cache()
+    skill_demand = build_skill_demand(detail, fact, roles_df, snapshot_date)
+    for row in skill_demand.where(F.col("role").isNull() & (F.col("skill_rank") <= 10)).orderBy("skill_rank").collect():
+        print(f"    skill #{row['skill_rank']} {row['skill']:<14} {row['job_count']} postings ({row['share_pct']}%), "
+              f"{row['company_count']} companies")
+
     # ---- publish: one atomic Iceberg commit per table, then the version record --------------
     marts = [(f"{ICEBERG_CATALOG}.{args['iceberg_database']}.{name}", df) for name, df in
-             (("fact_job_posting", fact), ("demand_by_role", demand), ("role_opportunity", opportunity))]
+             (("fact_job_posting", fact), ("demand_by_role", demand), ("role_opportunity", opportunity),
+              ("job_detail", detail), ("skill_demand", skill_demand))]
     record = publish_iceberg(marts, run_id=run_id, snapshot_date=snapshot_date)
     # Written last: Step Functions publishes completion only from this record.
     s3.put_object(Bucket=bucket, Key=f"state/gold_iceberg/run_id={run_id}.json",

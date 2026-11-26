@@ -159,3 +159,106 @@ def test_role_opportunity_reports_unknown_remote_separately(spark, bronze):
     assert de["remote_pct"] == 33.3                 # share of ALL postings: unknown is not remote
     assert de["remote_unknown_count"] == 1
     assert de["remote_unknown_pct"] == 33.3
+
+
+# ---- skills, job_detail and skill_demand ------------------------------------------------------
+@pytest.mark.parametrize("text, expected", [
+    ("Java and JavaScript", ["Java", "JavaScript"]),
+    ("NoSQL, MySQL and SQL", ["MySQL", "NoSQL", "SQL"]),
+    ("Python, Go, or Rust", ["Go", "Python", "Rust"]),
+    ("Backend Engineer (Go)", ["Go"]),
+    ("you will go to market and make good calls", []),
+    ("C# and .NET Core, ASP.NET", [".NET", "C#"]),
+    ("C++ and CPP", ["C++"]),
+    ("React, TypeScript", ["React", "TypeScript"]),
+    ("react quickly to incidents", []),
+    ("Spring Boot", ["Spring"]),
+    ("spring 2027 internship", []),
+    ("Apache Spark and Kafka", ["Kafka", "Spark"]),
+    ("this role will spark joy", []),
+    ("helm charts on k8s", ["Helm", "Kubernetes"]),
+    ("take the helm", []),
+    ("git and GitHub Actions", ["Git", "GitHub Actions"]),
+    ("Swift response times", []),
+    ("SwiftUI", ["Swift"]),
+    ("a node in the graph", []),
+    ("Node.js", ["Node.js"]),
+])
+def test_extract_skills_matches_whole_tokens_and_skips_english_words(text, expected):
+    assert s2g.extract_skills("", text) == expected
+
+
+def test_extract_skills_reads_title_and_truncated_description():
+    assert s2g.extract_skills("Rust Engineer", None) == ["Rust"]
+    late = "x" * s2g.SKILL_TEXT_LIMIT + " Kafka"
+    assert s2g.extract_skills("", late) == []
+
+
+@pytest.mark.parametrize("skill, company, expected", [
+    ("Databricks", "Databricks", True), ("Elasticsearch", "Elastic", True), ("MongoDB", "MongoDB", True),
+    ("Go", "Gong", False), ("Python", "Databricks", False), ("Git", "GitLab", False),
+])
+def test_employer_product_is_not_a_skill(skill, company, expected):
+    assert s2g.is_employer_name(skill, company) is expected
+    if expected:
+        assert s2g.extract_skills("", f"Join {company}. You know {skill} and Python.", company) == ["Python"]
+
+
+def test_every_skill_has_a_category_and_a_unique_name():
+    names = [name for name, _, _ in s2g.SKILLS]
+    assert len(names) == len(set(names))
+    assert set(s2g.SKILL_CATEGORY) == set(names)
+
+
+DETAIL_ROWS = [
+    ("greenhouse", "databricks", "1", "Databricks", "Senior Data Engineer", "Remote", True, "u",
+     "2026-01-01T00:00:00+00:00", "Spark, Python and Databricks"),
+    ("lever", "acme", "2", "Acme", "Data Engineer", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "Python and SQL"),
+    ("ashby", "zed", "3", "Zed", "Office Manager", "NYC", False, "u", "2026-01-01T00:00:00+00:00", "Excellent people skills"),
+]
+
+
+@pytest.fixture(scope="module")
+def detail_inputs(spark, bronze):
+    raw = bronze(DETAIL_ROWS).withColumn(
+        "salary_min", F.when(F.col("source_job_id") == "2", 100000.0).when(F.col("source_job_id") == "3", 10.0)
+    ).withColumn("salary_max", F.when(F.col("source_job_id") == "2", 120000.0).when(F.col("source_job_id") == "3", 90.0)
+    ).withColumn("salary_currency", F.when(F.col("salary_min").isNotNull(), "USD")
+    ).withColumn("salary_interval", F.when(F.col("source_job_id") == "2", "year"))
+    silver = b2s.build_silver(raw, SNAPSHOT)
+    fact = s2g.build_fact(silver)
+    return silver, fact, s2g.build_job_detail(fact, silver, s2g.make_roles_df(spark)).cache()
+
+
+def test_job_detail_has_one_row_per_fact_posting_with_skills_and_salary(detail_inputs):
+    _, fact, detail = detail_inputs
+    rows = {r.description.split(" ")[0]: r for r in detail.collect()}
+    assert detail.count() == fact.count() == 3
+    assert rows["Spark,"].skills == ["Python", "Spark"]           # Databricks is the employer
+    assert rows["Python"].skills == ["Python", "SQL"]
+    assert (rows["Python"].salary_min, rows["Python"].salary_interval, rows["Python"].salary_range_plausible) == (
+        100000.0, "year", True)
+    assert rows["Excellent"].salary_range_plausible is False       # 90 > 4 x 10
+    assert rows["Spark,"].salary_min is None and rows["Spark,"].salary_range_plausible is None
+    assert (rows["Spark,"].role, rows["Excellent"].role) == ("Data Engineer", None)
+
+
+def test_job_detail_from_silver_without_salary_columns(spark, bronze):
+    silver = b2s.build_silver(bronze(DETAIL_ROWS), SNAPSHOT).drop(*s2g.SALARY_COLUMNS)
+    detail = s2g.build_job_detail(s2g.build_fact(silver), silver, s2g.make_roles_df(spark))
+    assert detail.where(F.col("salary_min").isNotNull()).count() == 0
+    assert dict(detail.dtypes)["salary_min"] == "double"
+
+
+def test_skill_demand_scopes_all_postings_and_each_role(spark, detail_inputs):
+    _, fact, detail = detail_inputs
+    rows = s2g.build_skill_demand(detail, fact, s2g.make_roles_df(spark), SNAPSHOT).collect()
+    scope = {(r.role, r.skill): r for r in rows}
+    python_all = scope[(None, "Python")]
+    assert (python_all.job_count, python_all.posting_total, python_all.share_pct, python_all.skill_rank) == (2, 3, 66.7, 1)
+    assert python_all.company_count == 2 and python_all.category == "language"
+    python_de = scope[("Data Engineer", "Python")]
+    assert (python_de.job_count, python_de.posting_total, python_de.share_pct) == (2, 2, 100.0)
+    assert scope[("Data Engineer", "SQL")].share_pct == 50.0
+    assert {r.role for r in rows} == {None, "Data Engineer"}       # the office manager has no role
+    assert str(rows[0].snapshot_date) == SNAPSHOT
