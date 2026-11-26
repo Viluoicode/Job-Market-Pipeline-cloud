@@ -1,5 +1,6 @@
 """Display semantics; title rules intentionally match the Gold transform."""
 import re
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 # Identical copy of the Gold taxonomy in glue/jobs/silver_to_gold.py (tests enforce equality).
@@ -98,3 +99,34 @@ def safe_link(value):
     value = str(value or "")
     parsed = urlparse(value)
     return value if parsed.scheme in {"https", "http"} and parsed.hostname else None
+
+
+# ---- presentation ---------------------------------------------------------------------------------
+PLATFORM_NAMES = {"greenhouse": "Greenhouse", "lever": "Lever", "ashby": "Ashby", "arbeitnow": "Arbeitnow"}
+
+
+def platform_label(source):
+    return PLATFORM_NAMES.get(source, str(source).capitalize())
+
+
+def format_utc(value):
+    """One timestamp format for the whole page, e.g. "25 Nov 2026, 18:01 UTC".
+
+    The manifest, the completion marker and Athena write timestamps differently (offset, Z, none).
+    """
+    if not value:
+        return "Unknown"
+    text = str(value).replace("Z", "+00:00").replace(" ", "T", 1)
+    try:
+        moment = datetime.fromisoformat(text)
+    except ValueError:
+        return str(value)
+    moment = moment.replace(tzinfo=timezone.utc) if moment.tzinfo is None else moment.astimezone(timezone.utc)
+    return f"{moment.day} {moment:%b %Y, %H:%M} UTC"
+
+
+def snapshot_stamp(metadata):
+    """The page's snapshot stamp: published date, pinned Iceberg version and data age."""
+    day = datetime.fromisoformat(metadata["snapshot_date"])
+    return (f"Snapshot {day.day} {day:%b %Y} · Iceberg version …{metadata['fact_snapshot_id'][-4:]} · "
+            f"{metadata['ingestion_age_hours']:.1f} h old")

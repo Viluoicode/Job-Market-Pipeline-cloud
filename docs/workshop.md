@@ -161,7 +161,8 @@ resources and the separate runtime roles, not an unimplemented target design.
 - [x] Security acceptance and same-day overwrite recovery documented (30 September).
 - [x] Next scheduled execution and live dashboard checked (1 October); see
   [evidence](evidence/handoff-check-20261001.json). This is a dated observation, not a live guarantee.
-- [x] Four PNG screenshots exist under `docs/screenshots/` (retaken 22 Nov 2026, snapshot 21 Nov UTC).
+- [x] Four PNG screenshots exist under `docs/screenshots/` (retaken 26 Nov 2026 after the dashboard
+  redesign, snapshot 25 Nov UTC).
 - [x] AWS-icon diagram added: `docs/diagrams/architecture.drawio` and `architecture.png`, embedded in
   README and `docs/architecture.md` (22 Nov 2026).
 - [x] Diagram redrawn by hand and checked against the deployment; Gold shown as Iceberg tables

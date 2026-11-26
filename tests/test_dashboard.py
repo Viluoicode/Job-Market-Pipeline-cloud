@@ -10,7 +10,17 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "dashboard"))
 import data_access as data
-from model import DEFAULT_ROLES, ROLE_EXCLUDE, ROLE_FAMILIES, classify, remote_label, safe_link
+from model import (
+    DEFAULT_ROLES,
+    ROLE_EXCLUDE,
+    ROLE_FAMILIES,
+    classify,
+    format_utc,
+    platform_label,
+    remote_label,
+    safe_link,
+    snapshot_stamp,
+)
 
 
 def publication():
@@ -192,3 +202,28 @@ def test_remote_label_handles_pandas_values():
     import pandas as pd
     assert pd.Series([True, False]).map(remote_label).tolist() == ["Remote", "Onsite / hybrid"]  # numpy.bool_
     assert [remote_label(v) for v in (np.nan, pd.NA, np.True_)] == ["Unknown", "Unknown", "Remote"]
+
+
+# ---- presentation helpers -----------------------------------------------------------------------
+@pytest.mark.parametrize("raw", ["2026-11-25T18:01:34.565077+00:00", "2026-11-25T18:01:34.177Z",
+                                 "2026-11-25 18:01:34.177"])
+def test_timestamps_have_one_format_on_screen(raw):
+    # The manifest, the completion marker and Athena each write timestamps differently.
+    assert format_utc(raw) == "25 Nov 2026, 18:01 UTC"
+
+
+def test_unreadable_timestamp_is_shown_as_given():
+    assert format_utc("not a time") == "not a time"
+    assert format_utc(None) == "Unknown"
+
+
+def test_platform_names_are_written_as_the_products_spell_them():
+    assert [platform_label(s) for s in ["greenhouse", "lever", "ashby", "arbeitnow"]] == [
+        "Greenhouse", "Lever", "Ashby", "Arbeitnow"]
+    assert platform_label("newsource") == "Newsource"
+
+
+def test_snapshot_stamp_names_date_version_and_age():
+    stamp = snapshot_stamp({"snapshot_date": "2026-11-25", "fact_snapshot_id": "7341989610745604202",
+                            "ingestion_age_hours": 7.42})
+    assert stamp == "Snapshot 25 Nov 2026 · Iceberg version …4202 · 7.4 h old"
