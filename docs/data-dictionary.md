@@ -155,3 +155,21 @@ The page shows one published snapshot, not a daily-new-jobs count or a market gr
 A run at 01:00 UTC+7 on 28 September has UTC snapshot date 27 September. This is expected.
 Ngày snapshot nhỏ hơn ngày trên đồng hồ Việt Nam một ngày không đồng nghĩa với dữ liệu bị chậm.
 Check the actual ingestion timestamp and publication health.
+
+## Downstream consumers / Hệ thống dùng Gold
+
+[Job Market Radar](https://github.com/Viluoicode/job-market-radar) loads Gold into Postgres for a
+public trends API and CV matching. It reads only through the completion marker and Athena
+`FOR VERSION AS OF`, under the dashboard reader role, and it depends on these columns. Renaming or
+removing one breaks its Loader, so change them together with Radar.
+
+Job Market Radar đọc Gold qua marker và Athena với reader role chỉ đọc. Đổi tên hoặc bỏ các cột dưới
+đây thì phải sửa Radar cùng lúc.
+
+| Table | Columns |
+| --- | --- |
+| `fact_job_posting` | `job_id`, `source`, `board_token`, `company`, `title`, `location`, `is_remote`, `apply_url`, `posted_at`, `first_seen_at`, `last_seen_at`, `snapshot_date` |
+| `job_detail` | `job_id`, `snapshot_date`, `role`, `description`, `skills`, `salary_min`, `salary_max`, `salary_currency`, `salary_interval`, `salary_range_plausible` |
+| `skill_demand` | `snapshot_date`, `role`, `skill`, `category`, `skill_rank`, `job_count`, `company_count`, `posting_total`, `share_pct` |
+| `demand_by_role` | `snapshot_date`, `role`, `job_count` |
+| Completion marker | `run_id`, `snapshot_date`, `iceberg_snapshots.<table>.snapshot_id` for the four tables above |
