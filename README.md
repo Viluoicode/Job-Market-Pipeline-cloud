@@ -104,12 +104,53 @@ the free tier; S3 and DynamoDB added cents per day. Gold can exceed one run's Br
 from a failed or incomplete board keep their last observation while still inside the freshness
 window ([why](docs/sample_results.md), [lifecycle](docs/architecture.md)).
 
-## Built on this pipeline
+## System overview
 
-[Job Market Radar](https://github.com/Viluoicode/job-market-radar) loads the published Gold into
-Postgres and serves skill trends, published salaries and job search through a .NET API. It reads
-only through the completion marker and the read-only reader role; the columns it depends on are
-listed in the [data dictionary](docs/data-dictionary.md#downstream-consumers--hệ-thống-dùng-gold).
+This pipeline is the data half of a two-repository system. **This repo produces the data;**
+[Job Market Radar](https://github.com/Viluoicode/job-market-radar) loads it into Postgres and
+serves skill trends, published salaries, job search and CV matching through a .NET API. The two
+share no code and never call each other. Their only interface is what this pipeline publishes on
+S3: the Gold tables and the completion marker that pins one version of each.
+
+```
+ Job Market AWS Pipeline (this repo, AWS)          Job Market Radar (.NET)
+ ────────────────────────────────────────          ──────────────────────────────────────────
+ 36 job boards: Greenhouse, Lever, Ashby, Arbeitnow
+      │ nightly, 01:00 UTC+7
+      ▼
+ Bronze ─► Silver ─► Gold (Iceberg on S3)
+                     fact_job_posting, job_detail,
+                     skill_demand, demand_by_role
+      │
+      ▼
+ state/pipeline/latest.json  ─────────────────►  Radar.Loader
+ (completion marker: one snapshot id per table)     reads the pinned snapshots through Athena
+                                                    with the read-only reader role, writes
+                                                    Postgres in one transaction
+                                                      │
+                                                      ▼
+                                                  Postgres + pgvector ─► Radar.Api ─► web
+```
+
+| | Pipeline (this repo) | Radar |
+| --- | --- | --- |
+| Owns | Collection, cleaning, posting lifecycle, quality gates, skill and salary extraction, Gold | The Postgres copy, search, trends, CV matching, the public site |
+| Runs | Step Functions on AWS, every night | Loader after a pipeline run (by hand today, scheduled in Radar's Sprint 4); API on request |
+| Interface | Publishes the columns listed under [Downstream consumers](docs/data-dictionary.md#downstream-consumers--hệ-thống-dùng-gold) | Reads only those, at the pinned versions; fails at load time if one is missing |
+
+Two rules keep the repositories independent:
+
+- A column Radar depends on is renamed or removed only together with a Radar change. The list is
+  in the data dictionary.
+- Radar never reads Gold files directly and cannot write to the lake: it assumes the same
+  read-only role as the dashboard. Why: Radar's ADR 001.
+
+**Example: a CV upload (planned for Radar's Sprint 3).** The request never reaches this pipeline;
+the postings it needs are already in Postgres. After each load, Radar stores a Bedrock embedding of
+every posting's `description` (from `job_detail`). The API embeds the CV text with the same model,
+combines vector similarity with keyword search, and compares the CV's skills with each posting's
+`skills`, which come from this pipeline's dictionary. It answers with the best postings, their
+original `apply_url`, and the skills the CV lacks.
 
 ## Tech stack
 
